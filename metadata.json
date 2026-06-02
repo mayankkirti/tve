@@ -1,0 +1,8 @@
+{
+  "name": "Trisha Video Engine",
+  "description": "High-quality video generator with music, customizable parameters, AI-powered effects, tracklists, and batch rendering.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
