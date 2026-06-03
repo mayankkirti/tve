@@ -7,6 +7,8 @@ import { execSync } from 'child_process';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
+import { saveJobs, loadJobs } from './jobStore';
+
 export interface JobConfig {
   channelName: string;
   songName: string;
@@ -30,7 +32,7 @@ export interface RenderJobState {
   outputPath?: string;
 }
 
-export const jobs: Record<string, RenderJobState> = {};
+export const jobs: Record<string, RenderJobState> = loadJobs();
 
 export async function startRenderJob(id: string, config: JobConfig) {
   jobs[id] = { id, progress: 0, status: 'rendering' };
@@ -161,9 +163,9 @@ export async function startRenderJob(id: string, config: JobConfig) {
               jobs[id].timemark = progress.timemark;
           }
       })
-      .on('end', (stdout, stderr) => {
+      .on('end', () => {
           if (jobs[id].status === 'error') return;
-          console.log("FFmpeg finished. Stderr:", stderr);
+          console.log("FFmpeg finished.");
           jobs[id].progress = 100;
           jobs[id].status = 'completed';
           jobs[id].outputPath = outputPath;
@@ -175,9 +177,8 @@ export async function startRenderJob(id: string, config: JobConfig) {
             if (config.logoPath && fs.existsSync(config.logoPath)) fs.unlinkSync(config.logoPath);
           } catch(e) { console.error("Cleanup error", e); }
       })
-      .on('error', (err, stdout, stderr) => {
+      .on('error', (err) => {
           console.error("FFmpeg error:", err);
-          console.error("FFmpeg stderr:", stderr);
           jobs[id].status = 'error';
           jobs[id].error = err.message;
           

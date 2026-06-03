@@ -5,9 +5,15 @@ import multer from "multer";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { startRenderJob, jobs } from "./src/server/renderer";
+import { saveJobs } from "./src/server/jobStore";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Periodic state save
+setInterval(() => {
+    saveJobs(jobs);
+}, 5000);
 
 // Cleanup sweep
 setInterval(() => {
