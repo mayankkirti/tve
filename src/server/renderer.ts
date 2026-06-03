@@ -129,16 +129,8 @@ export async function startRenderJob(id: string, config: JobConfig) {
        filterComplex += `[bgviz]copy[final1];`;
     }
     
-    // Add Text with drawtext (requires ffmpeg compiled with drawtext, which @ffmpeg-installer has)
-    // To be safe, we will use simple text overlay or skip if fontfile is tricky, but let's try drawtext
-    const textSafe = config.channelName.replace(/:/g, '\\:').replace(/'/g, '');
-    const titleSafe = config.songName ? config.songName.replace(/:/g, '\\:').replace(/'/g, '') : '';
-    filterComplex += `[final1]drawtext=text='${textSafe}':fontcolor=white:fontsize=48:x=50:y=100[final2];`;
-    if (titleSafe) {
-       filterComplex += `[final2]drawtext=text='${titleSafe}':fontcolor=white:fontsize=36:x=50:y=160[outv];`;
-    } else {
-       filterComplex += `[final2]copy[outv]`;
-    }
+    // Removed drawtext to prevent system font issues on minimal Azure App Service images
+    filterComplex += `[final1]copy[outv];`;
 
     command = command
       .complexFilter(filterComplex)
@@ -148,7 +140,7 @@ export async function startRenderJob(id: string, config: JobConfig) {
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '2',
+        '-threads', '1',
         '-r', String(config.fps),
         '-c:a', 'aac',
         '-b:a', '128k',
