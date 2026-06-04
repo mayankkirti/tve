@@ -217,17 +217,17 @@ export async function startRenderJob(id: string, config: JobConfig) {
     let vizFilter = "";
     switch (config.style) {
       case "minimal-fast":
-        vizFilter = `showwaves=s=${config.width}x${Math.floor(config.height * 0.3)}:mode=p2p:colors=white:draw=full`;
+        vizFilter = `showwaves=s=${config.width}x${Math.floor(config.height * 0.3)}:mode=p2p:colors=white`;
         break;
       case "psychedelic":
-        vizFilter = `showcqt=s=${config.width}x${config.height}:bar_h=${Math.floor(config.height * 0.2)}:axis_h=0:sonicg=4:sono_g=4:sono_v=10`;
+        vizFilter = `showcqt=s=${config.width}x${config.height}:bar_h=${Math.floor(config.height * 0.2)}:axis_h=0:sono_g=4:sono_v=10`;
         break;
       case "indian-ambient":
         vizFilter = `showfreqs=s=${config.width}x${config.height}:mode=bar:ascale=log:fscale=log:colors=orange`;
         break;
       case "party-flash":
       case "chillout-flash":
-        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rate=${config.fps}`;
+        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2`;
         break;
       default:
         vizFilter = `showwaves=s=${config.width}x${config.height}:mode=cline:colors=white`;
@@ -258,7 +258,7 @@ export async function startRenderJob(id: string, config: JobConfig) {
     }
 
     // Removed drawtext to prevent system font issues on minimal Azure App Service images
-    filterComplex += `[final1]copy[outv];`;
+    filterComplex += `[final1]copy[outv]`;
 
     command = command
       .complexFilter(filterComplex)
