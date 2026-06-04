@@ -52,7 +52,10 @@ export default function App() {
 
   const handleLogout = async () => {
      try {
-        await fetch('/api/logout', { method: 'POST' });
+        await fetch('/api/logout', { 
+           method: 'POST',
+           headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } 
+        });
      } catch(e) {}
      localStorage.removeItem('auth_token');
      setAuthToken(null);

@@ -35,6 +35,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
       if (job && job.backendId) {
         fetch(`/api/jobs/${job.backendId}/cancel`, {
           method: "POST",
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
           credentials: "same-origin",
         }).catch(console.error);
       }
@@ -101,7 +102,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
             res = await fetch("/api/upload-chunk", {
               method: "POST",
               body: formData,
-              headers: { Accept: "application/json" },
+              headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}`,  Accept: "application/json" },
               credentials: "same-origin",
             });
             if (res.status === 429) {
@@ -158,7 +159,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
             res = await fetch("/api/upload-chunk", {
               method: "POST",
               body: formData,
-              headers: { Accept: "application/json" },
+              headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}`,  Accept: "application/json" },
               credentials: "same-origin",
             });
 
@@ -298,7 +299,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
         response = await fetch("/api/render", {
           method: "POST",
           credentials: "same-origin",
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}`, 
             "Content-Type": "application/json",
             Accept: "application/json",
           },
@@ -365,6 +366,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
       while (!isCancelled) {
         try {
           const statusRes = await fetch(`/api/jobs/${jobId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}`, ...(`/api/jobs/${jobId}` !== "/api/upload-chunk" ? { 'Content-Type': 'application/json' } : {}) }, 
             credentials: "same-origin",
           });
 
@@ -412,6 +414,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
               let dlRetries = 10;
               while (dlRetries > 0) {
                 videoRes = await fetch(`/api/jobs/${jobId}/download`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}`, ...(`/api/jobs/${jobId}/download` !== "/api/upload-chunk" ? { 'Content-Type': 'application/json' } : {}) }, 
                   method: "HEAD",
                   credentials: "same-origin",
                 });
@@ -441,7 +444,10 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
                       ytRes = await fetch(`/api/jobs/${jobId}/youtube`, {
                         method: 'POST',
                         credentials: 'same-origin',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                          Authorization: `Bearer ${localStorage.getItem('auth_token')}`, 
+                          'Content-Type': 'application/json' 
+                        },
                         body: JSON.stringify({ token: youtubeToken, title: nextJob.config.name || nextJob.config.songName || 'Rendered Video', description: '' })
                       });
                       if (ytRes.url && ytRes.url.includes('cookie_check')) {
