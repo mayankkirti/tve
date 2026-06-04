@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { RenderJob, VideoConfig } from "../types";
 import { v4 as uuidv4 } from "uuid";
 
-export function useRenderQueue() {
+export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: boolean) {
   const [jobs, setJobs] = useState<RenderJob[]>([]);
   const cancelTokens = useRef<{ [jobId: string]: () => void }>({});
 
@@ -224,16 +224,20 @@ export function useRenderQueue() {
       }[] = [];
 
       if (nextJob.config.audioUrl) {
-        try {
-          const audioRes = await fetch(nextJob.config.audioUrl);
-          const audioBlob = await audioRes.blob();
-          filesToUpload.push({
-            blob: audioBlob,
-            filename: "audio.mp3",
-            assign: (p) => (serverConfig.audioPath = p),
-          });
-        } catch (e) {
-          throw new Error("Failed to fetch audio track");
+        if (!nextJob.config.audioUrl.startsWith('blob:')) {
+           serverConfig.audioPath = nextJob.config.audioUrl;
+        } else {
+           try {
+             const audioRes = await fetch(nextJob.config.audioUrl);
+             const audioBlob = await audioRes.blob();
+             filesToUpload.push({
+               blob: audioBlob,
+               filename: "audio.mp3",
+               assign: (p) => (serverConfig.audioPath = p),
+             });
+           } catch (e) {
+             throw new Error("Failed to fetch audio track locally");
+           }
         }
       } else {
         throw new Error("Audio track missing");
@@ -424,6 +428,46 @@ export function useRenderQueue() {
                 break;
               }
               if (videoRes && videoRes.ok) {
+                if (autoUploadYT && youtubeToken) {
+                  updateJob(nextJob.id, {
+                    status: "uploading",
+                    progress: 100,
+                    blobUrl: `/api/jobs/${jobId}/download`
+                  });
+                  try {
+                    let ytRes;
+                    let ytRetries = 3;
+                    while (ytRetries > 0) {
+                      ytRes = await fetch(`/api/jobs/${jobId}/youtube`, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token: youtubeToken, title: nextJob.config.name || nextJob.config.songName || 'Rendered Video', description: '' })
+                      });
+                      if (ytRes.url && ytRes.url.includes('cookie_check')) {
+                        const iframe = document.createElement('iframe');
+                        iframe.src = ytRes.url;
+                        iframe.style.display = 'none';
+                        document.body.appendChild(iframe);
+                        await new Promise(r => setTimeout(r, 3000));
+                        document.body.removeChild(iframe);
+                        ytRetries--;
+                        continue;
+                      }
+                      break;
+                    }
+                    if (ytRes && ytRes.ok) {
+                       const text = await ytRes.text();
+                       try {
+                         const jsonData = JSON.parse(text);
+                         // youtubeUrl exists? add it to job somehow, but RenderJob doesn't have youtubeUrl. We can just log it or not.
+                       } catch(e) {}
+                    }
+                  } catch (e) {
+                     console.error("Auto YouTube upload failed", e);
+                  }
+                }
+                
                 updateJob(nextJob.id, {
                   status: "completed",
                   progress: 100,

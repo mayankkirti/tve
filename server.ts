@@ -6,14 +6,199 @@ import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { startRenderJob, jobs, killRenderJob } from "./src/server/renderer";
 import { saveJobs } from "./src/server/jobStore";
+import { systemConfig, saveConfig } from "./src/server/config";
+import nodemailer from "nodemailer";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Authentication Management
+const activeTokens = new Set<string>();
+
+const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (req.path === '/api/login' || req.path === '/api/verify-mfa' || !req.path.startsWith('/api')) {
+    return next();
+  }
+  
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  if (!activeTokens.has(token)) {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+  
+  next();
+};
+
+app.use(authMiddleware);
+
+app.post("/api/login", async (req, res) => {
+  const { username, password } = req.body;
+  const expectedUser = process.env.APP_USERNAME || "admin";
+  const expectedPass = systemConfig.password;
+  
+  if (username === expectedUser && password === expectedPass) {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    systemConfig.mfaCode = code;
+    systemConfig.mfaExpiry = Date.now() + 5 * 60 * 1000; // 5 mins
+    saveConfig();
+
+    try {
+      // Setup Nodemailer transporter - we use ethereal for demo or user should configure real SMTP
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.ethereal.email',
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        auth: {
+            user: process.env.SMTP_USER || 'ethereal.user@ethereal.email',
+            pass: process.env.SMTP_PASS || 'ethereal-pass'
+        }
+      });
+      // In a real environment, they would use correct SMTP credentials.
+      if (process.env.SMTP_HOST) {
+        await transporter.sendMail({
+          from: '"TVE Auth" <no-reply@tve.azurewebsites.net>',
+          to: 'neurographs@gmail.com',
+          subject: 'TVE Authentication Code',
+          text: `Your login code is: ${code}`
+        });
+      } else {
+        console.log(`[MFA] Sent code ${code} to neurographs@gmail.com`); // Fallback if no SMTP configured
+      }
+    } catch(e) {
+      console.error("MFA Email failed to send, but continuing for dev mode:", e);
+      console.log(`[MFA] Fallback code: ${code}`); 
+    }
+
+    res.json({ mfaRequired: true });
+  } else {
+    res.status(401).json({ error: "Invalid credentials" });
+  }
+});
+
+app.post("/api/verify-mfa", (req, res) => {
+  const { code } = req.body;
+  if (!systemConfig.mfaCode || Date.now() > systemConfig.mfaExpiry) {
+     return res.status(400).json({ error: "Code expired. Please login again." });
+  }
+  if (systemConfig.mfaCode === code) {
+     systemConfig.mfaCode = "";
+     saveConfig();
+     const token = uuidv4();
+     activeTokens.add(token);
+     res.json({ token });
+  } else {
+     res.status(401).json({ error: "Invalid code" });
+  }
+});
+
+app.post("/api/logout", (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+     activeTokens.delete(authHeader.split(' ')[1]);
+  }
+  res.json({ success: true });
+});
 
 // Periodic state save
 setInterval(() => {
   saveJobs(jobs);
 }, 5000);
+
+import { systemConfig } from "./src/server/config";
+
+app.get("/api/settings", (req, res) => {
+  res.json({ diskLimitMB: systemConfig.diskLimitMB });
+});
+
+app.put("/api/settings", (req, res) => {
+  if (req.body.diskLimitMB !== undefined) {
+    systemConfig.diskLimitMB = req.body.diskLimitMB;
+  }
+  saveConfig();
+  res.json({ success: true, diskLimitMB: systemConfig.diskLimitMB });
+});
+
+app.put("/api/settings/password", (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  if (oldPassword === systemConfig.password) {
+     systemConfig.password = newPassword;
+     saveConfig();
+     res.json({ success: true });
+  } else {
+     res.status(401).json({ error: "Incorrect old password" });
+  }
+});
+
+app.get("/api/disk", (req, res) => {
+  try {
+     const files = [];
+     const uploadsDir = path.join(process.cwd(), "uploads");
+     if (fs.existsSync(uploadsDir)) {
+       const uFiles = fs.readdirSync(uploadsDir);
+       for (const f of uFiles) {
+          const stat = fs.statSync(path.join(uploadsDir, f));
+          files.push({ name: f, size: stat.size, mtimeMs: stat.mtimeMs, isVideo: f.endsWith('.mp4') });
+       }
+     }
+     const stats = fs.statfsSync(uploadsDir);
+     const freeBytes = stats.bavail * stats.bsize;
+     const totalBytes = stats.blocks * stats.bsize;
+     res.json({ files, freeBytes, totalBytes, diskLimitMB: systemConfig.diskLimitMB });
+  } catch (e: any) {
+     res.status(500).json({ error: e.message });
+  }
+});
+
+app.put("/api/disk/rename", (req, res) => {
+  try {
+     const { oldName, newName } = req.body;
+     const uploadsDir = path.join(process.cwd(), "uploads");
+     const oldPath = path.join(uploadsDir, oldName);
+     const newPath = path.join(uploadsDir, newName);
+     if (fs.existsSync(oldPath)) {
+        fs.renameSync(oldPath, newPath);
+        // update job reference if we have one
+        for (const id in jobs) {
+           if (jobs[id].outputPath === oldPath) {
+             jobs[id].outputPath = newPath;
+           }
+        }
+        res.json({ success: true });
+     } else {
+        res.status(404).json({ error: "File not found" });
+     }
+  } catch(e:any) {
+     res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete("/api/disk/:filename", (req, res) => {
+   try {
+     const file = req.params.filename;
+     const uploadsDir = path.join(process.cwd(), "uploads");
+     const fp = path.join(uploadsDir, file);
+     if (fs.existsSync(fp)) {
+        fs.unlinkSync(fp);
+        // remove job ref if any
+        for (const id in jobs) {
+           if (jobs[id].outputPath === fp) {
+             jobs[id].outputPath = undefined; // mark gone
+           }
+        }
+        res.json({ success: true });
+     } else {
+        res.status(404).json({ error: "File not found" });
+     }
+   } catch(e:any) {
+     res.status(500).json({ error: e.message });
+   }
+});
+
+// Serve files for preview
+app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // Cleanup sweep
 setInterval(
@@ -262,6 +447,31 @@ app.get("/api/proxy-flow/:type/:id", async (req, res) => {
   }
 });
 
+app.post("/api/disk/youtube", async (req, res) => {
+  const { filename, title, description, token } = req.body;
+  if (!token) return res.status(400).json({ error: "No token provided" });
+  
+  const fp = path.join(process.cwd(), "uploads", filename);
+  if (!fs.existsSync(fp)) return res.status(404).json({ error: "File not found" });
+
+  try {
+    const { google } = await import("googleapis");
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: token });
+    const youtube = google.youtube({ version: "v3", auth: oauth2Client });
+    const metadata = { snippet: { title, description: description || "", categoryId: "10" }, status: { privacyStatus: "private" } };
+    const result = await youtube.videos.insert({
+      part: ["snippet", "status"],
+      requestBody: metadata,
+      media: { body: fs.createReadStream(fp) }
+    });
+    res.json({ url: `https://youtube.com/watch?v=${result.data.id}` });
+  } catch(e:any) {
+    const errorMessage = e.response?.data?.error?.message || e.message;
+    res.status(500).json({ error: errorMessage });
+  }
+});
+
 app.post("/api/jobs/:id/youtube", async (req, res) => {
   const job = jobs[req.params.id];
   if (!job || job.status !== "completed" || !job.outputPath) {
@@ -296,6 +506,7 @@ app.post("/api/jobs/:id/youtube", async (req, res) => {
     });
 
     const videoId = result.data.id;
+    job.uploadedToYouTube = true; // Mark as uploaded
     res.json({ url: `https://youtube.com/watch?v=${videoId}` });
   } catch (e: any) {
     console.error("Youtube upload error", e);

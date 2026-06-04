@@ -5,17 +5,26 @@ import { Settings, Image as ImageIcon, Music, Play, Plus, X, RotateCcw } from 'l
 import { cn } from '../lib/utils';
 import { parseTracklist } from '../engine/RenderEngine';
 import { AudioCropper } from './AudioCropper';
+import { YouTubeSettings } from './YouTubeSettings';
 
 export function SettingsPanel({
   config,
   setConfig,
   onAddToQueue,
-  onReset
+  onReset,
+  youtubeToken,
+  setYoutubeToken,
+  autoUploadYT,
+  setAutoUploadYT
 }: {
   config: VideoConfig;
   setConfig: React.Dispatch<React.SetStateAction<VideoConfig>>;
   onAddToQueue: () => void;
   onReset: () => void;
+  youtubeToken: string | null;
+  setYoutubeToken: (t: string | null) => void;
+  autoUploadYT: boolean;
+  setAutoUploadYT: (b: boolean) => void;
 }) {
   const [audioDuration, setAudioDuration] = React.useState<number>(0);
   const audioRef = React.useRef<HTMLAudioElement>(null);
@@ -120,11 +129,20 @@ export function SettingsPanel({
 
           <label className="flex items-center gap-2 p-3 bg-zinc-800 hover:bg-zinc-700 rounded cursor-pointer border border-zinc-700 transition-colors">
             <Music className="w-4 h-4" />
-            <span className="flex-1 truncate">{config.audioUrl ? 'Audio Selected' : 'Upload Audio (Required)'}</span>
+            <span className="flex-1 truncate">{config.audioUrl && config.audioUrl.startsWith('blob:') ? 'Audio Selected' : 'Upload Audio (Required)'}</span>
             <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleFileChange(e, 'audioUrl')} />
           </label>
+          <div className="flex items-center gap-2">
+            <input 
+              type="text" 
+              placeholder="Or paste Google Drive URL..." 
+              value={config.audioUrl && !config.audioUrl.startsWith('blob:') ? config.audioUrl : ''}
+              onChange={(e) => setConfig(prev => ({ ...prev, audioUrl: e.target.value }))}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 text-xs focus:outline-none focus:border-zinc-500"
+            />
+          </div>
 
-          {config.audioUrl && (
+          {config.audioUrl && config.audioUrl.startsWith('blob:') && (
               <div className="bg-zinc-800/50 p-3 rounded border border-zinc-800 space-y-3">
                   <div className="flex items-center justify-between">
                      <span className="text-xs font-semibold uppercase text-zinc-500">Audio Crop</span>
@@ -352,6 +370,8 @@ export function SettingsPanel({
             <div className="text-xs text-zinc-500 mt-1">Parsed: {config.parsedTracklist.length} tracks found</div>
           </div>
         </div>
+        
+        <YouTubeSettings token={youtubeToken} setToken={setYoutubeToken} autoUploadYT={autoUploadYT} setAutoUploadYT={setAutoUploadYT} />
 
       </div>
 

@@ -60,26 +60,102 @@ export function killRenderJob(id: string) {
   }
 }
 
+import { systemConfig } from "./config";
+
+function checkAndFreeDiskSpace() {
+  try {
+    const uploadsDir = path.join(process.cwd(), "uploads");
+    
+    // Instead of completely relying on physical free space, we also calculate the logic space used by our uploads folder.
+    let totalUsedByApp = 0;
+    if (fs.existsSync(uploadsDir)) {
+      const uFiles = fs.readdirSync(uploadsDir);
+      for (const f of uFiles) {
+         totalUsedByApp += fs.statSync(path.join(uploadsDir, f)).size;
+      }
+    }
+    
+    const stats = fs.statfsSync(uploadsDir);
+    const physicalFreeBytes = stats.bavail * stats.bsize;
+    const requiredBufferBytes = 500 * 1024 * 1024; // We physically need at least 500MB free safely
+    
+    const limitBytes = systemConfig.diskLimitMB * 1024 * 1024;
+
+    if (physicalFreeBytes < requiredBufferBytes || totalUsedByApp > limitBytes) {
+      console.log(`Disk management triggered. Used by app: ${Math.round(totalUsedByApp/1024/1024)}MB. Limit: ${systemConfig.diskLimitMB}MB. Physical Free: ${Math.round(physicalFreeBytes/1024/1024)}MB. Attempting cleanup...`);
+
+      // Find oldest videos
+      
+      let oldestJobId = null;
+      let oldestTime = Infinity;
+      
+      // Try to find an uploaded one first if possible
+      for (const jid in jobs) {
+         const j = jobs[jid];
+         if (j.status === "completed" && j.outputPath && fs.existsSync(j.outputPath)) {
+            const st = fs.statSync(j.outputPath);
+            const apparentAge = (j as any).uploadedToYouTube ? 0 : st.mtimeMs;
+            if (apparentAge < oldestTime) {
+               oldestTime = apparentAge;
+               oldestJobId = jid;
+            }
+         }
+      }
+      
+      if (oldestJobId) {
+         fs.unlinkSync(jobs[oldestJobId].outputPath!);
+         delete jobs[oldestJobId];
+         console.log(`Deleted oldest video to free up space: ${oldestJobId}`);
+         // Check again
+         checkAndFreeDiskSpace();
+      }
+    }
+  } catch(e) {
+    console.error("Failed to check disk space", e);
+  }
+}
+
 export async function startRenderJob(id: string, config: JobConfig) {
   jobs[id] = { id, progress: 0, status: "rendering" };
   const outputPath = path.join(process.cwd(), "uploads", `${id}.mp4`);
 
   try {
+    checkAndFreeDiskSpace();
+    
     await checkBackpressure();
     if (jobs[id].status !== "rendering") return; // Job was cancelled while waiting
     activeRenderThreads++;
 
     console.log("Starting render job", id);
+
+    let finalAudioPath = config.audioPath;
+    if (finalAudioPath.startsWith('http')) {
+        let downloadUrl = finalAudioPath;
+        const driveMatch = finalAudioPath.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+        if (driveMatch) {
+            downloadUrl = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+        }
+        console.log("Downloading audio from URL:", downloadUrl);
+        const res = await fetch(downloadUrl);
+        if (!res.ok) throw new Error("Failed to download audio from url: " + res.statusText);
+        const buffer = await res.arrayBuffer();
+        finalAudioPath = path.join(process.cwd(), "uploads", `temp_${id}.mp3`);
+        fs.writeFileSync(finalAudioPath, Buffer.from(buffer));
+    }
+
     try {
-      const asize = fs.statSync(config.audioPath).size;
+      const asize = fs.statSync(finalAudioPath).size;
       console.log("Audio size:", asize);
     } catch (e) {
       console.log("Audio size err:", e);
     }
     try {
       if (config.bgPaths.length > 0) {
-        const bgsize = fs.statSync(config.bgPaths[0]).size;
-        console.log("Bg size:", bgsize);
+        let bgPath = config.bgPaths[0];
+        if (!bgPath.startsWith('http')) {
+          const bgsize = fs.statSync(bgPath).size;
+          console.log("Bg size:", bgsize);
+        }
       }
     } catch (e) {
       console.log("Bg size err:", e);
@@ -88,7 +164,7 @@ export async function startRenderJob(id: string, config: JobConfig) {
     let totalSeconds = 0;
     try {
       const out = execSync(
-        `${ffmpegInstaller.path} -i "${config.audioPath}" 2>&1 || true`,
+        `${ffmpegInstaller.path} -i "${finalAudioPath}" 2>&1 || true`,
       ).toString();
       const match = out.match(/Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2})/);
       if (match) {
@@ -105,7 +181,7 @@ export async function startRenderJob(id: string, config: JobConfig) {
     let command = ffmpeg();
 
     // Inputs
-    command = command.input(config.audioPath);
+    command = command.input(finalAudioPath);
 
     // Make sure we have a background
     const bgScale = `scale=${config.width}:${config.height}:force_original_aspect_ratio=decrease,pad=${config.width}:${config.height}:(ow-iw)/2:(oh-ih)/2`;

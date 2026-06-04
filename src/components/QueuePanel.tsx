@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { RenderJob } from '../types';
 import { Play, X, Download, AlertCircle, Loader, Clock, Trash2 } from 'lucide-react';
 import { formatTime } from '../lib/utils';
-import { YouTubeUploader } from './YouTubeUploader';
 
 export function QueuePanel({
   jobs,
