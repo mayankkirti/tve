@@ -10,6 +10,8 @@ import { systemConfig, saveConfig } from "./src/server/config";
 import nodemailer from "nodemailer";
 
 const app = express();
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 const PORT = process.env.PORT || 3000;
 
 // Authentication Management
@@ -239,9 +241,6 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage });
-
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Setup chunked upload directories
 const chunksDir = path.join(process.cwd(), "chunks");
