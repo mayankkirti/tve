@@ -1,10 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import { RenderJobState } from './renderer';
+import type { RenderJobState } from './renderer';
 
 const storePath = path.join(process.cwd(), 'jobs.json');
 
-export { RenderJobState };
+export type { RenderJobState };
 
 export function loadJobs(): Record<string, RenderJobState> {
     try {

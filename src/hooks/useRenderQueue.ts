@@ -84,7 +84,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
         filename: string,
       ): Promise<string> => {
         const uploadId = uuidv4();
-        const chunkSize = 1024 * 1024 * 4; // 4MB chunks to bypass nginx limits
+        const chunkSize = 256 * 1024; // 512KB chunks to bypass nginx limits // 4MB chunks to bypass nginx limits
         const totalChunks = Math.ceil(blob.size / chunkSize);
 
         if (totalChunks === 0) {
@@ -121,10 +121,11 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
               continue;
             }
             if (!res.ok) {
-              retries--;
-              await new Promise((r) => setTimeout(r, 2000));
-              continue;
-            }
+  console.error('Upload error', res.status, await res.text());
+  retries--;
+  await new Promise((r) => setTimeout(r, 2000));
+  continue;
+}
             try {
               const text = await res.text();
               data = JSON.parse(text);
@@ -182,10 +183,11 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
             }
 
             if (!res.ok) {
-              retries--;
-              await new Promise((r) => setTimeout(r, 2000));
-              continue;
-            }
+  console.error('Upload error', res.status, await res.text());
+  retries--;
+  await new Promise((r) => setTimeout(r, 2000));
+  continue;
+}
 
             try {
               const text = await res.text();

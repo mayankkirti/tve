@@ -12,7 +12,7 @@ import nodemailer from "nodemailer";
 const app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 // Authentication Management
 const activeTokens = new Set<string>();
@@ -249,6 +249,10 @@ if (!fs.existsSync(chunksDir)) {
 }
 
 app.post("/api/upload-chunk", upload.single("chunk"), (req, res) => {
+  console.log("Got upload chunk for:", req.body.uploadId, req.body.chunkIndex);
+  if (!req.file) {
+    console.error("Missing chunk file! body:", req.body);
+  }
   const { uploadId, chunkIndex, totalChunks, filename } = req.body;
   if (!req.file) return res.status(400).json({ error: "Missing chunk file" });
 
