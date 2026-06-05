@@ -266,7 +266,7 @@ export async function renderVideoTask(
       const ctx = canvas.getContext('2d', { alpha: false })!;
 
       const particles: Particle[] = [];
-      if (config.style !== 'minimal-fast') {
+      if (config.style !== 'minimal-fast' && config.style !== 'indian-ambient') {
           const numParticles = config.style === 'abstract' ? 20 : (config.style === 'psychedelic' ? 300 : (config.style === 'indian-ambient' ? 150 : 100));
           for (let i = 0; i < numParticles; i++) {
             particles.push(new Particle(canvas.width, canvas.height, config.style));
@@ -620,7 +620,7 @@ export async function renderVideoTask(
             ctx.restore();
          }
 
-         if (config.style !== 'minimal-fast') {
+         if (config.style !== 'minimal-fast' && config.style !== 'indian-ambient') {
              ctx.save();
              if (config.style === 'chillout') {
                 ctx.fillStyle = `rgba(0, 0, 0, ${0.3 - normalizedReactivity * 0.2})`;
@@ -693,7 +693,7 @@ export async function renderVideoTask(
             ctx.drawImage(logoImg, canvas.width - padding - logoSize, padding, logoSize, logoSize);
          }
 
-         if (config.style === 'minimal-fast') {
+                  if (config.style === 'minimal-fast') {
              ctx.save();
              const visW = logoSize;
              const visH = logoSize;
@@ -714,6 +714,41 @@ export async function renderVideoTask(
                  ctx.beginPath();
                  ctx.roundRect(visX + i * (barW + barSpace), visY + visH - h, barW, h, barW/2);
                  ctx.fill();
+             }
+             ctx.restore();
+         } else if (config.style === 'indian-ambient') {
+             ctx.save();
+             // Golden horizontal party-flash visualizer (lightweight)
+             const visW = canvas.width * 0.6;
+             const visH = canvas.height * 0.15;
+             const visX = (canvas.width - visW) / 2;
+             const visY = canvas.height - padding - visH * 1.5;
+             
+             const numBars = Math.floor(visW / 12);
+             const barW = 8;
+             const barSpace = 4;
+             
+             // Base golden line
+             ctx.fillStyle = '#FFD700'; // Gold
+             ctx.shadowColor = '#FFA500';
+             ctx.shadowBlur = normalizedReactivity * 15 + 5;
+             
+             for (let i = 0; i < numBars; i++) {
+                 // Fast high-frequency changes like party flash
+                 const variance = Math.max(0.1, (Math.sin(currentTime * 20 + i * 1.5) * Math.cos(currentTime * 15 - i * 0.3) * 0.5 + 0.5));
+                 let h = visH * normalizedReactivity * variance;
+                 h = Math.max(2, Math.min(visH, h));
+                 
+                 // Add flashes of bright yellow/white on high hits
+                 if (h > visH * 0.7 && Math.random() > 0.5) {
+                     ctx.fillStyle = '#FFFFFF';
+                     ctx.shadowBlur = 20;
+                 } else {
+                     ctx.fillStyle = '#FFD700';
+                     ctx.shadowBlur = 10;
+                 }
+                 
+                 ctx.fillRect(visX + i * (barW + barSpace), visY + (visH - h)/2, barW, h);
              }
              ctx.restore();
          }

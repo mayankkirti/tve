@@ -212,6 +212,23 @@ export function SettingsPanel({
             <span className="flex-1 truncate text-zinc-300">{config.logoUrl ? 'Logo Selected' : 'Upload Logo'}</span>
             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'logoUrl')} />
           </label>
+
+          {config.logoUrl && (
+             <div className="space-y-1">
+               <label className="text-zinc-400 text-xs flex justify-between">
+                 <span>Logo Size</span>
+                 <span>{config.logoSize}%</span>
+               </label>
+               <input
+                 type="range"
+                 min="10"
+                 max="200"
+                 value={config.logoSize || 100}
+                 onChange={(e) => setConfig(prev => ({ ...prev, logoSize: parseInt(e.target.value) }))}
+                 className="w-full accent-blue-500 bg-zinc-800 block rounded"
+               />
+             </div>
+          )}
         </div>
 
         {/* Visuals */}

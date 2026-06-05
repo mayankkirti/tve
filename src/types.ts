@@ -23,6 +23,7 @@ export interface VideoConfig {
   audioCropStart: number;
   audioCropEnd: number;
   logoUrl: string | null;
+  logoSize: number; // 0 to 200, percentage based
   tracklistRaw: string;
   parsedTracklist: TrackInfo[];
   style: VisualizerStyle;

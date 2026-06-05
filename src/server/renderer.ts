@@ -21,6 +21,9 @@ export interface JobConfig {
   audioPath: string; // local file paths
   bgPaths: string[];
   logoPath?: string;
+  logoSize?: number;
+  tracklistRaw?: string;
+  textSize?: number;
 }
 
 export interface RenderJobState {
@@ -186,29 +189,25 @@ export async function startRenderJob(id: string, config: JobConfig) {
     // Make sure we have a background
     const bgScale = `scale=${config.width}:${config.height}:force_original_aspect_ratio=decrease,pad=${config.width}:${config.height}:(ow-iw)/2:(oh-ih)/2`;
 
+    let numBgInputs = 0;
     if (config.bgPaths.length > 0) {
-      const bgPath = config.bgPaths[0];
-      const bgExt = bgPath.toLowerCase();
-      const isBgVideo =
-        bgExt.endsWith(".mp4") ||
-        bgExt.endsWith(".webm") ||
-        bgExt.endsWith(".mov");
-
-      if (isBgVideo) {
-        command = command.input(bgPath).inputOptions(["-stream_loop", "-1"]);
-      } else {
-        command = command.input(bgPath).inputOptions(["-loop", "1"]);
+      for (const bgPath of config.bgPaths) {
+        const bgExt = bgPath.toLowerCase();
+        const isBgVideo = bgExt.endsWith(".mp4") || bgExt.endsWith(".webm") || bgExt.endsWith(".mov");
+        if (isBgVideo) { command = command.input(bgPath).inputOptions(["-stream_loop", "-1"]); } 
+        else { command = command.input(bgPath).inputOptions(["-loop", "1"]); }
+        numBgInputs++;
       }
     } else {
-      command = command
-        .input(`color=c=black:s=${config.width}x${config.height}`)
-        .inputFormat("lavfi");
+      command = command.input(`color=c=black:s=${config.width}x${config.height}:r=${config.fps}`).inputFormat("lavfi");
+      numBgInputs++;
     }
 
     if (config.logoPath && !fs.existsSync(config.logoPath)) {
       config.logoPath = undefined;
     }
 
+    const logoInputIndex = numBgInputs + 1;
     if (config.logoPath) {
       command = command.input(config.logoPath).inputOptions(["-loop", "1"]);
     }
@@ -223,7 +222,8 @@ export async function startRenderJob(id: string, config: JobConfig) {
         vizFilter = `showcqt=s=${config.width}x${config.height}:bar_h=${Math.floor(config.height * 0.2)}:axis_h=0:sono_g=4:sono_v=10`;
         break;
       case "indian-ambient":
-        vizFilter = `showfreqs=s=${config.width}x${config.height}:mode=bar:ascale=log:fscale=log:colors=orange`;
+        // Lightweight golden horizontal waveform (like a party flash but horizontal)
+        vizFilter = `showwaves=s=${config.width}x${Math.floor(config.height * 0.3)}:mode=cline:colors=gold`;
         break;
       case "party-flash":
       case "chillout-flash":
@@ -237,7 +237,61 @@ export async function startRenderJob(id: string, config: JobConfig) {
     let filterComplex = "";
     let lastOut = "0:a";
 
-    filterComplex += `[1:v]${bgScale},format=yuv420p[bg];`;
+    if (config.bgPaths.length > 1) {
+      filterComplex += `color=c=black:s=${config.width}x${config.height}:r=${config.fps}[base];`;
+      let prevBgOut = "[base]";
+      
+      const parseTime = (timeStr) => {
+        const parts = timeStr.split(':').map(Number);
+        if (parts.length === 2) return parts[0] * 60 + parts[1];
+        if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        return 0;
+      };
+      
+      let tracks = [];
+      if (config.tracklistRaw) {
+        const lines = config.tracklistRaw.split('\n').map((l) => l.trim()).filter(Boolean);
+        for (const line of lines) {
+          const match = line.match(/^(\d{1,2}:\d{2}(?::\d{2})?)[ \t]*(?:\||-|—)?[ \t]+(.+)$/);
+          if (match) tracks.push({ timeSeconds: parseTime(match[1]) });
+        }
+        tracks.sort((a, b) => a.timeSeconds - b.timeSeconds);
+      }
+      
+      const K = config.bgPaths.length;
+      let segments = [];
+      if (tracks.length > 0) {
+        for (let i = 0; i < tracks.length; i++) {
+          segments.push({
+            start: tracks[i].timeSeconds,
+            end: tracks[i+1] ? tracks[i+1].timeSeconds : totalSeconds || 999999,
+            bgIndex: i % K
+          });
+        }
+        if (tracks[0].timeSeconds > 0) {
+          segments.unshift({ start: 0, end: tracks[0].timeSeconds, bgIndex: (K - 1) % K });
+        }
+      } else {
+        segments.push({ start: 0, end: 999999, bgIndex: 0 });
+      }
+      
+      for (let i = 0; i < numBgInputs; i++) {
+        filterComplex += `[${i+1}:v]${bgScale},format=yuv420p[scaled_bg${i}];`;
+      }
+      
+      let sid = 0;
+      for (const seg of segments) {
+        const nextOut = `[base${sid}]`;
+        filterComplex += `${prevBgOut}[scaled_bg${seg.bgIndex}]overlay=enable='between(t,${seg.start},${seg.end})'${nextOut};`;
+        prevBgOut = nextOut;
+        sid++;
+      }
+      
+      filterComplex += `${prevBgOut}copy[bg];`;
+    } else {
+      filterComplex += `[1:v]${bgScale},format=yuv420p[bg];`;
+    }
+
     filterComplex += `[0:a]${vizFilter}[viz];`;
 
     // Blend background and visualizer based on style
@@ -251,14 +305,44 @@ export async function startRenderJob(id: string, config: JobConfig) {
 
     // Add Logo
     if (config.logoPath) {
-      filterComplex += `[2:v]scale=120:120[logo];`;
+      const sizeVal = config.logoSize || 100;
+      const targetW = Math.floor(120 * (sizeVal / 100));
+      const w = targetW + (targetW % 2); 
+      filterComplex += `[${logoInputIndex}:v]scale=${w}:-1[logo];`;
       filterComplex += `[bgviz][logo]overlay=W-w-50:50[final1];`;
     } else {
       filterComplex += `[bgviz]copy[final1];`;
     }
 
-    // Removed drawtext to prevent system font issues on minimal Azure App Service images
-    filterComplex += `[final1]copy[outv]`;
+    const fontPath = path.join(process.cwd(), "public", "font.ttf").replace(/\\/g, "/");
+    let prevOut = "[final1]";
+    let filterIndex = 1;
+    const tracklistFileCleanup = path.join(process.cwd(), `tracklist_${id}.txt`);
+
+    const addTextOptions = [];
+    const baseTextSize = (config.textSize || 100) / 100;
+    
+    // helper to escape text for ffmpeg
+    const escapeText = (t) => t.replace(/'/g, "\\\'").replace(/:/g, "\\:");
+
+    if (config.channelName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.channelName)}':fontcolor=white:fontsize=${Math.floor(40 * baseTextSize)}:x=50:y=100`);
+    if (config.albumName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.albumName)}':fontcolor=white:fontsize=${Math.floor(30 * baseTextSize)}:x=50:y=150`);
+    if (config.songName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.songName)}':fontcolor=white:fontsize=${Math.floor(50 * baseTextSize)}:x=50:y=h-200`);
+    if (config.artistName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='By ${escapeText(config.artistName)}':fontcolor=white:fontsize=${Math.floor(30 * baseTextSize)}:x=50:y=h-150`);
+
+    if (config.tracklistRaw) {
+       fs.writeFileSync(tracklistFileCleanup, config.tracklistRaw);
+       addTextOptions.push(`drawtext=fontfile='${fontPath}':textfile='${tracklistFileCleanup.replace(/\\/g, "/")}':fontcolor=white:fontsize=${Math.floor(24 * baseTextSize)}:x=w-400:y=200`);
+    }
+
+    addTextOptions.forEach((drawtextStr) => {
+       const nextOut = `[t${filterIndex}]`;
+       filterComplex += `${prevOut}${drawtextStr}${nextOut};`;
+       prevOut = nextOut;
+       filterIndex++;
+    });
+
+    filterComplex += `${prevOut}format=yuv420p[outv]`;
 
     command = command
       .complexFilter(filterComplex)
@@ -322,6 +406,8 @@ export async function startRenderJob(id: string, config: JobConfig) {
           });
           if (config.logoPath && fs.existsSync(config.logoPath))
             fs.unlinkSync(config.logoPath);
+          const tracklistFileCleanup = path.join(process.cwd(), `tracklist_${id}.txt`);
+          if (fs.existsSync(tracklistFileCleanup)) fs.unlinkSync(tracklistFileCleanup);
         } catch (e) {
           console.error("Cleanup error", e);
         }
@@ -340,6 +426,8 @@ export async function startRenderJob(id: string, config: JobConfig) {
           });
           if (config.logoPath && fs.existsSync(config.logoPath))
             fs.unlinkSync(config.logoPath);
+          const tracklistFileCleanup = path.join(process.cwd(), `tracklist_${id}.txt`);
+          if (fs.existsSync(tracklistFileCleanup)) fs.unlinkSync(tracklistFileCleanup);
         } catch (e) {}
       });
 

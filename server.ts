@@ -352,6 +352,9 @@ app.post("/api/render", (req, res) => {
     audioPath: config.audioPath,
     bgPaths: config.bgPaths || [],
     logoPath: config.logoPath,
+    logoSize: config.logoSize || 100,
+    tracklistRaw: config.tracklistRaw || '',
+    textSize: config.textSize || 100,
   });
 
   res.json({ jobId });
