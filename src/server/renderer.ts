@@ -30,7 +30,7 @@ export interface RenderJobState {
   id: string;
   progress: number;
   timemark?: string;
-  status: "rendering" | "completed" | "error";
+  status: "rendering" | "completed" | "error" | "paused";
   error?: string;
   outputPath?: string;
 }
@@ -52,6 +52,18 @@ async function checkBackpressure() {
     };
     check();
   });
+}
+
+
+export function pauseRenderJob(id: string) {
+  if (activeCommands[id]) {
+    try { activeCommands[id].kill('SIGSTOP'); jobs[id].status = 'paused'; } catch (e) {}
+  }
+}
+export function resumeRenderJob(id: string) {
+  if (activeCommands[id]) {
+    try { activeCommands[id].kill('SIGCONT'); jobs[id].status = 'rendering'; } catch (e) {}
+  }
 }
 
 export function killRenderJob(id: string) {
@@ -223,7 +235,7 @@ export async function startRenderJob(id: string, config: JobConfig) {
         break;
       case "indian-ambient":
         // Lightweight golden horizontal waveform (like a party flash but horizontal)
-        vizFilter = `showwaves=s=${config.width}x${Math.floor(config.height * 0.3)}:mode=cline:colors=gold`;
+        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2`;
         break;
       case "party-flash":
       case "chillout-flash":
@@ -326,7 +338,7 @@ export async function startRenderJob(id: string, config: JobConfig) {
     const escapeText = (t) => t.replace(/'/g, "\\\'").replace(/:/g, "\\:");
 
     if (config.channelName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.channelName)}':fontcolor=white:fontsize=${Math.floor(40 * baseTextSize)}:x=50:y=100`);
-    if (config.albumName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.albumName)}':fontcolor=white:fontsize=${Math.floor(30 * baseTextSize)}:x=50:y=150`);
+    if (config.albumName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.albumName)}':fontcolor=white:fontsize=${Math.floor(30 * baseTextSize)}:x=50:y=h-100`);
     if (config.songName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.songName)}':fontcolor=white:fontsize=${Math.floor(50 * baseTextSize)}:x=50:y=h-200`);
     if (config.artistName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='By ${escapeText(config.artistName)}':fontcolor=white:fontsize=${Math.floor(30 * baseTextSize)}:x=50:y=h-150`);
 

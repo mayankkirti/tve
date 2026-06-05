@@ -2,16 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { RenderJob } from '../types';
 import { Play, X, Download, AlertCircle, Loader, Clock, Trash2 } from 'lucide-react';
 import { formatTime } from '../lib/utils';
+import { YouTubeUploader } from './YouTubeUploader';
 
 export function QueuePanel({
   jobs,
   startQueue,
   killJob,
+  pauseJob,
+  resumeJob,
   removeJob
 }: {
   jobs: RenderJob[];
   startQueue: () => void;
   killJob: (id: string) => void;
+  pauseJob: (id: string) => void;
+  resumeJob: (id: string) => void;
   removeJob: (id: string) => void;
 }) {
   const [now, setNow] = useState(Date.now());
@@ -140,49 +145,33 @@ export function QueuePanel({
                   {job.status === 'completed' && <span className="text-green-400">Completed</span>}
                   {job.status === 'failed' && <span className="text-red-400">Failed: {job.error}</span>}
                   {job.status === 'killed' && <span className="text-orange-400">Killed</span>}
+                  {job.status === 'paused' && <span className="text-yellow-400">Paused</span>}
                 </div>
 
-                {(job.status === 'rendering' || job.status === 'uploading') && (
-                  <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden mt-1">
-                    <div className={`h-full transition-all duration-300 ${job.status === 'uploading' ? 'bg-blue-500' : 'bg-indigo-500'}`} style={{ width: `${job.progress}%` }} />
-                  </div>
-                )}
                 
-                {job.status !== 'queued' && (
-                  <div className="flex justify-between items-center text-[10px] text-zinc-500 font-mono mt-2 pt-2 border-t border-zinc-700/50">
-                     <span className="flex items-center gap-1">Took: {formatTime(timeTook)}</span>
-                     {job.status === 'rendering' && (
-                       <span className="flex items-center gap-1">Left: {formatTime(timeLeft)}</span>
-                     )}
-                  </div>
+                {job.status === 'rendering' && (
+                  <button 
+                    onClick={() => pauseJob(job.id)}
+                    className="flex-1 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 py-1.5 rounded text-xs font-medium transition-colors"
+                  >
+                    Pause
+                  </button>
                 )}
-              </div>
-
-              {/* Actions */}
-              <div className="mt-3 flex gap-2">
-                {(job.status === 'rendering' || job.status === 'uploading') && (
+                {job.status === 'paused' && (
+                  <button 
+                    onClick={() => resumeJob(job.id)}
+                    className="flex-1 bg-green-500/10 hover:bg-green-500/20 text-green-500 py-1.5 rounded text-xs font-medium transition-colors"
+                  >
+                    Resume
+                  </button>
+                )}
+                {(job.status === 'rendering' || job.status === 'uploading' || job.status === 'paused') && (
                   <button 
                     onClick={() => killJob(job.id)}
                     className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 py-1.5 rounded text-xs font-medium transition-colors"
                   >
                     Kill {job.status === 'uploading' ? 'Upload' : 'Render'}
                   </button>
-                )}
-                {job.status === 'completed' && job.blobUrl && (
-                  <div className="flex w-full gap-2 flex-col">
-                    <div className="flex gap-2">
-                       <a 
-                         href={job.blobUrl}
-                         download={job.config.name + '.mp4'}
-                         target="_blank"
-                         rel="noopener noreferrer"
-                         className="flex-1 flex items-center justify-center gap-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 py-1.5 rounded text-xs font-medium transition-colors"
-                       >
-                          <Download className="w-4 h-4" /> Download
-                       </a>
-                       <YouTubeUploader job={job} />
-                    </div>
-                  </div>
                 )}
               </div>
             </div>

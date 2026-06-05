@@ -41,7 +41,7 @@ export default function App() {
   const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('auth_token'));
   const [currentView, setCurrentView] = useState<'studio' | 'storage' | 'security'>('studio');
 
-  const { jobs, addJob, removeJob, killJob, startQueue } = useRenderQueue(youtubeToken, autoUploadYT);
+  const { jobs, addJob, removeJob, killJob, pauseJob, resumeJob, startQueue } = useRenderQueue(youtubeToken, autoUploadYT);
 
   useEffect(() => {
     const isRendering = jobs.some(j => j.status === 'rendering' || j.status === 'uploading');
@@ -199,6 +199,8 @@ export default function App() {
             jobs={jobs}
             startQueue={startQueue}
             killJob={killJob}
+            pauseJob={pauseJob}
+            resumeJob={resumeJob}
             removeJob={removeJob}
           />
          </>

@@ -133,10 +133,13 @@ export function StorageManager() {
 
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-xl flex flex-col justify-center">
                <h3 className="text-zinc-400 text-sm font-medium uppercase tracking-wider mb-4 flex items-center gap-2"><Settings className="w-4 h-4" /> Capacity Settings</h3>
+               
                <div className="flex items-center gap-4">
-                  <input type="range" min="500" max="10240" step="100" value={diskLimitMB} onChange={e => setDiskLimitMB(Number(e.target.value))} onMouseUp={e => updateLimit(Number((e.target as any).value))} className="w-full accent-indigo-500" />
-                  <span className="text-white font-bold whitespace-nowrap bg-zinc-800 px-3 py-1 rounded w-24 text-center">{diskLimitMB} MB</span>
+                  <input type="number" min="500" value={diskLimitMB} onChange={e => setDiskLimitMB(Number(e.target.value))} className="w-full bg-zinc-800 border-zinc-700 rounded px-3 py-2 text-white font-bold" />
+                  <span className="text-zinc-400">MB</span>
+                  <button onClick={() => updateLimit(diskLimitMB)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-medium transition-colors whitespace-nowrap">Save</button>
                </div>
+
                <p className="text-xs text-zinc-500 mt-3 leading-relaxed">
                   Maximum storage allowed before the engine automatically deletes the oldest completed videos to make space for new render jobs.
                </p>

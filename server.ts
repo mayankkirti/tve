@@ -4,7 +4,7 @@ import { createServer as createViteServer } from "vite";
 import multer from "multer";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
-import { startRenderJob, jobs, killRenderJob } from "./src/server/renderer";
+import { startRenderJob, jobs, killRenderJob, pauseRenderJob, resumeRenderJob } from "./src/server/renderer";
 import { saveJobs } from "./src/server/jobStore";
 import { systemConfig, saveConfig } from "./src/server/config";
 import nodemailer from "nodemailer";
@@ -373,6 +373,21 @@ app.get("/api/jobs/:id", (req, res) => {
     return res.status(404).json({ error: "Job not found" });
   }
   res.json(job);
+});
+
+
+app.post('/api/jobs/:id/pause', (req, res) => {
+  if (jobs[req.params.id] && jobs[req.params.id].status === 'rendering') {
+    pauseRenderJob(req.params.id);
+  }
+  res.json({ success: true });
+});
+
+app.post('/api/jobs/:id/resume', (req, res) => {
+  if (jobs[req.params.id] && jobs[req.params.id].status === 'paused') {
+    resumeRenderJob(req.params.id);
+  }
+  res.json({ success: true });
 });
 
 app.post("/api/jobs/:id/cancel", (req, res) => {

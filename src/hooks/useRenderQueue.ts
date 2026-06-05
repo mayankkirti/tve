@@ -1,10 +1,25 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { RenderJob, VideoConfig } from "../types";
 import { v4 as uuidv4 } from "uuid";
 
 export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: boolean) {
-  const [jobs, setJobs] = useState<RenderJob[]>([]);
+  
+  const [jobs, setJobs] = useState<RenderJob[]>(() => {
+    try {
+      const saved = localStorage.getItem('render_queue_jobs');
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('render_queue_jobs', JSON.stringify(jobs));
+  }, [jobs]);
+
   const cancelTokens = useRef<{ [jobId: string]: () => void }>({});
+
+  
+  
 
   const addJob = useCallback(
     (config: VideoConfig, fileSystemWritable?: any, outPath?: string) => {
@@ -27,6 +42,35 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
       cancelTokens.current[id]();
       delete cancelTokens.current[id];
     }
+  }, []);
+
+  
+  const pauseJob = useCallback((id: string) => {
+    setJobs((prev) => {
+      const job = prev.find((j) => j.id === id);
+      if (job && job.backendId) {
+        fetch(`/api/jobs/${job.backendId}/pause`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
+        }).catch(console.error);
+        job.status = 'paused';
+      }
+      return [...prev];
+    });
+  }, []);
+
+  const resumeJob = useCallback((id: string) => {
+    setJobs((prev) => {
+      const job = prev.find((j) => j.id === id);
+      if (job && job.backendId) {
+        fetch(`/api/jobs/${job.backendId}/resume`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
+        }).catch(console.error);
+        job.status = 'rendering';
+      }
+      return [...prev];
+    });
   }, []);
 
   const killJob = useCallback((id: string) => {
@@ -56,6 +100,39 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
       prev.map((j) => (j.id === id ? { ...j, ...updates } : j)),
     );
   }, []);
+
+// Poll active backend status
+  useEffect(() => {
+    let active = true;
+    const poll = async () => {
+       if (!active) return;
+       for (const job of jobs) {
+          if (job.status === 'rendering' || job.status === 'uploading' || job.status === 'paused') {
+             if (job.backendId) {
+                try {
+                  const res = await fetch(`/api/jobs/${job.backendId}`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' }
+                  });
+                  if (res.ok) {
+                     const data = await res.json();
+                     if (data.status) {
+                        updateJob(job.id, {
+                           progress: data.progress || 0,
+                           error: data.error,
+                           etaMilliseconds: data.etaMilliseconds,
+                           status: data.status, ...(data.status === 'completed' ? { blobUrl: `/api/jobs/${job.backendId}/download`, progress: 100 } : {})
+                        });
+                     }
+                  }
+                } catch(e) {}
+             }
+          }
+       }
+       setTimeout(poll, 1000);
+    };
+    poll();
+    return () => { active = false; };
+  }, [jobs, updateJob]);
 
   const startQueue = useCallback(async () => {
     const nextJob = jobs.find((j) => j.status === "queued");
@@ -545,5 +622,5 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
     }
   }, [jobs, updateJob]);
 
-  return { jobs, addJob, removeJob, killJob, startQueue };
+  return { jobs, addJob, removeJob, killJob, pauseJob, resumeJob, startQueue };
 }

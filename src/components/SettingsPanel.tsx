@@ -1,4 +1,5 @@
 import React from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { VideoConfig, VisualizerStyle, TrackInfo } from '../types';
 import { RESOLUTIONS, GOOGLE_FONTS } from '../constants';
 import { Settings, Image as ImageIcon, Music, Play, Plus, X, RotateCcw } from 'lucide-react';
@@ -31,10 +32,80 @@ export function SettingsPanel({
 
   React.useEffect(() => {
     if (config.audioUrl && audioRef.current) {
-        audioRef.current.src = config.audioUrl;
+        audioRef.current.src = config.audioUrl.startsWith('/app/applet/uploads/') ? config.audioUrl.replace('/app/applet/uploads/', '/api/uploads/') : config.audioUrl;
         audioRef.current.load();
     }
   }, [config.audioUrl]);
+
+  
+  const [isUploadingMedia, setIsUploadingMedia] = React.useState(false);
+  const [uploadProgressText, setUploadProgressText] = React.useState('');
+
+  const uploadFilesToServer = async () => {
+    setIsUploadingMedia(true);
+    setUploadProgressText('Preparing...');
+    try {
+       const doUpload = async (blobUrl, originalFilename) => {
+           if (!blobUrl || !blobUrl.startsWith('blob:')) return blobUrl;
+           const blob = await fetch(blobUrl).then(r => r.blob());
+           const uploadId = uuidv4();
+           const chunkSize = 256 * 1024;
+           const totalChunks = Math.ceil(blob.size / chunkSize);
+           for (let i = 0; i < totalChunks; i++) {
+              setUploadProgressText(`Uploading ${originalFilename} ${Math.round((i/totalChunks)*100)}%`);
+              const start = i * chunkSize;
+              const chunk = blob.slice(start, Math.min(start + chunkSize, blob.size));
+              const formData = new FormData();
+              formData.append('uploadId', uploadId);
+              formData.append('chunkIndex', String(i));
+              formData.append('totalChunks', String(totalChunks));
+              formData.append('filename', originalFilename);
+              formData.append('chunk', chunk, 'chunk');
+              
+              let retries = 3;
+              while(retries-- > 0) {
+                 const res = await fetch('/api/upload-chunk', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` },
+                    body: formData
+                 });
+                 if (res.ok) {
+                    const data = await res.json();
+                    if (data.path) return data.path;
+                    break; // break retry loop, move to next chunk
+                 }
+              }
+           }
+           // removed status fetch
+           const finalData = await finalRes.json();
+           return finalData.path; // Or we can rely on last chunk returning path
+       };
+
+       let newConfig = { ...config };
+       if (config.audioUrl && config.audioUrl.startsWith('blob:')) {
+          newConfig.audioUrl = await doUpload(config.audioUrl, 'audio.mp3');
+       }
+       if (config.logoUrl && config.logoUrl.startsWith('blob:')) {
+          newConfig.logoUrl = await doUpload(config.logoUrl, 'logo.png');
+       }
+       let newBgs = [];
+       for (let i = 0; i < config.backgroundImages.length; i++) {
+          let bg = config.backgroundImages[i];
+          if (bg.startsWith('blob:')) {
+             newBgs.push(await doUpload(bg, 'bg.jpg'));
+          } else {
+             newBgs.push(bg);
+          }
+       }
+       newConfig.backgroundImages = newBgs;
+       setConfig(newConfig);
+       setUploadProgressText('Upload complete!');
+    } catch(e) {
+       console.error(e);
+       setUploadProgressText('Upload failed. Try again.');
+    }
+    setTimeout(() => setIsUploadingMedia(false), 2000);
+  };
 
   const handleAudioLoadedMetadata = () => {
       if (audioRef.current) {
@@ -160,7 +231,7 @@ export function SettingsPanel({
                   {config.audioCropEnabled && audioDuration > 0 && (
                       <div className="space-y-4">
                           <AudioCropper 
-                             audioUrl={config.audioUrl} 
+                             audioUrl={config.audioUrl.startsWith('/app/applet/uploads/') ? config.audioUrl.replace('/app/applet/uploads/', '/api/uploads/') : config.audioUrl} 
                              start={config.audioCropStart} 
                              end={config.audioCropEnd}
                              duration={audioDuration}
@@ -197,7 +268,7 @@ export function SettingsPanel({
                    {img.endsWith('#video') ? (
                      <video src={img} className="w-full h-full object-cover rounded border border-zinc-700" muted autoPlay loop playsInline />
                    ) : (
-                     <img src={img} className="w-full h-full object-cover rounded border border-zinc-700" alt="bg" />
+                     <img src={img.startsWith('/app/applet/uploads/') ? img.replace('/app/applet/uploads/', '/api/uploads/') : img} className="w-full h-full object-cover rounded border border-zinc-700" alt="bg" />
                    )}
                    <button onClick={() => removeImage(i)} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 transform translate-x-1 -translate-y-1 opacity-0 group-hover:opacity-100 transition-opacity">
                      <X className="w-2 h-2" />
@@ -393,8 +464,17 @@ export function SettingsPanel({
       </div>
 
       <div className="p-4 border-t border-zinc-800 space-y-2">
+        
+        <button 
+          onClick={uploadFilesToServer}
+          disabled={isUploadingMedia || (!config.audioUrl || !config.audioUrl.startsWith('blob:'))}
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded flex items-center justify-center gap-2 transition-colors mb-2"
+        >
+          {isUploadingMedia ? uploadProgressText : 'Upload Files to Server'}
+        </button>
         <button 
           onClick={onAddToQueue}
+
           disabled={!config.audioUrl}
           className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded flex items-center justify-center gap-2 transition-colors"
         >
