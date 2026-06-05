@@ -32,7 +32,7 @@ export function SettingsPanel({
 
   React.useEffect(() => {
     if (config.audioUrl && audioRef.current) {
-        audioRef.current.src = config.audioUrl.startsWith('/app/applet/uploads/') ? config.audioUrl.replace('/app/applet/uploads/', '/api/uploads/') : config.audioUrl;
+        audioRef.current.src = config.audioUrl.includes('/uploads/') ? '/api/uploads/' + config.audioUrl.split('/uploads/').pop() : config.audioUrl;
         audioRef.current.load();
     }
   }, [config.audioUrl]);
@@ -88,16 +88,21 @@ export function SettingsPanel({
        if (config.logoUrl && config.logoUrl.startsWith('blob:')) {
           newConfig.logoUrl = await doUpload(config.logoUrl, 'logo.png');
        }
+       
        let newBgs = [];
        for (let i = 0; i < config.backgroundImages.length; i++) {
           let bg = config.backgroundImages[i];
           if (bg.startsWith('blob:')) {
-             newBgs.push(await doUpload(bg, 'bg.jpg'));
+             let isVideo = bg.endsWith('#video');
+             let cleanUrl = bg.split('#')[0];
+             let uploadedPath = await doUpload(cleanUrl, isVideo ? 'bg.mp4' : 'bg.jpg');
+             newBgs.push(uploadedPath + (isVideo ? '#video' : '#image'));
           } else {
              newBgs.push(bg);
           }
        }
        newConfig.backgroundImages = newBgs;
+
        setConfig(newConfig);
        setUploadProgressText('Upload complete!');
     } catch(e) {
@@ -231,7 +236,7 @@ export function SettingsPanel({
                   {config.audioCropEnabled && audioDuration > 0 && (
                       <div className="space-y-4">
                           <AudioCropper 
-                             audioUrl={config.audioUrl.startsWith('/app/applet/uploads/') ? config.audioUrl.replace('/app/applet/uploads/', '/api/uploads/') : config.audioUrl} 
+                             audioUrl={config.audioUrl.includes('/uploads/') ? '/api/uploads/' + config.audioUrl.split('/uploads/').pop() : config.audioUrl} 
                              start={config.audioCropStart} 
                              end={config.audioCropEnd}
                              duration={audioDuration}
@@ -266,9 +271,9 @@ export function SettingsPanel({
                {config.backgroundImages.map((img, i) => (
                  <div key={i} className="relative w-12 h-12 flex-shrink-0 group">
                    {img.endsWith('#video') ? (
-                     <video src={img} className="w-full h-full object-cover rounded border border-zinc-700" muted autoPlay loop playsInline />
+                     <video src={img.includes('/uploads/') ? '/api/uploads/' + img.split('/uploads/').pop() : img} className="w-full h-full object-cover rounded border border-zinc-700" muted autoPlay loop playsInline />
                    ) : (
-                     <img src={img.startsWith('/app/applet/uploads/') ? img.replace('/app/applet/uploads/', '/api/uploads/') : img} className="w-full h-full object-cover rounded border border-zinc-700" alt="bg" />
+                     <img src={img.includes('/uploads/') ? '/api/uploads/' + img.split('/uploads/').pop() : img} className="w-full h-full object-cover rounded border border-zinc-700" alt="bg" />
                    )}
                    <button onClick={() => removeImage(i)} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 transform translate-x-1 -translate-y-1 opacity-0 group-hover:opacity-100 transition-opacity">
                      <X className="w-2 h-2" />

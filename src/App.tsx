@@ -130,9 +130,9 @@ export default function App() {
             >
                  {config.backgroundImages.length > 0 ? (
                     config.backgroundImages[0].endsWith('#video') ? (
-                       <video src={config.backgroundImages[0]} className="absolute inset-0 w-full h-full object-cover opacity-30" autoPlay loop muted playsInline volume={0} />
+                       <video src={config.backgroundImages[0]?.includes('/uploads/') ? '/api/uploads/' + config.backgroundImages[0].split('/uploads/').pop().replace('#video', '').replace('#image', '') : config.backgroundImages[0]} className="absolute inset-0 w-full h-full object-cover opacity-30" autoPlay loop muted playsInline volume={0} />
                     ) : (
-                       <img src={config.backgroundImages[0]} className="absolute inset-0 w-full h-full object-cover opacity-30" alt="Background preview" />
+                       <img src={config.backgroundImages[0]?.includes('/uploads/') ? '/api/uploads/' + config.backgroundImages[0].split('/uploads/').pop() : config.backgroundImages[0]} className="absolute inset-0 w-full h-full object-cover opacity-30" alt="Background preview" />
                     )
                  ) : (
                     <div className="absolute inset-0 w-full h-full bg-zinc-950 opacity-80" />
@@ -153,7 +153,7 @@ export default function App() {
                  </div>
 
                  {config.logoUrl && (
-                   <img src={config.logoUrl} className="absolute top-4 right-6 w-16 h-16 object-contain z-10" alt="Logo" />
+                   <img src={config.logoUrl?.includes('/uploads/') ? '/api/uploads/' + config.logoUrl.split('/uploads/').pop() : config.logoUrl} className="absolute top-4 right-6 w-16 h-16 object-contain z-10" alt="Logo" />
                  )}
 
                  <div className="absolute bottom-6 left-6 text-left z-10 drop-shadow-md">
