@@ -466,7 +466,7 @@ export function SettingsPanel({
               className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 focus:outline-none"
             >
               {GOOGLE_FONTS.map(f => (
-                 <option key={f.name} value={f.name}>{f.name}</option>
+                 <option key={f.value} value={f.value}>{f.label}</option>
               ))}
             </select>
           </div>
