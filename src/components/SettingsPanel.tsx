@@ -202,6 +202,21 @@ export function SettingsPanel({
         <div className="space-y-3">
           <label className="block text-xs font-semibold uppercase text-zinc-500">Media</label>
 
+          <div>
+             <label className="block mb-1">Multiple Backgrounds Style</label>
+             <select
+               value={config.bgMediaStyle || 'mix-cuts'}
+               onChange={(e) => setConfig(prev => ({ ...prev, bgMediaStyle: e.target.value as any }))}
+               className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 focus:outline-none"
+             >
+               <option value="tracklist">According to Tracklist Timing</option>
+               <option value="random-crossfade">Random Crossfade</option>
+               <option value="hard-cut">Hard Cut (Reactive on Music)</option>
+               <option value="soft-crossfade">Soft Crossfade (Reactive on Music)</option>
+               <option value="mix-cuts">Mix Cuts (Reactive on Music)</option>
+             </select>
+          </div>
+
           <label className="flex items-center gap-2 p-3 bg-zinc-800 hover:bg-zinc-700 rounded cursor-pointer border border-zinc-700 transition-colors">
             <Music className="w-4 h-4" />
             <span className="flex-1 truncate">{config.audioUrl && config.audioUrl.startsWith('blob:') ? 'Audio Selected' : 'Upload Audio (Required)'}</span>
@@ -309,6 +324,40 @@ export function SettingsPanel({
         {/* Visuals */}
         <div className="space-y-3">
           <label className="block text-xs font-semibold uppercase text-zinc-500">Visuals</label>
+
+          <div>
+             <div className="flex justify-between items-center mb-1">
+                <label className="block">Black Overlay Effect</label>
+                <button type="button" onClick={() => setConfig(prev => ({ ...prev, bypassOverlays: !prev.bypassOverlays }))} className={`text-xs px-2 py-1 rounded transition-colors ${!config.bypassOverlays ? 'bg-indigo-600 text-white' : 'bg-red-600 text-white'}`}>{config.bypassOverlays ? 'Bypassing' : 'Active'}</button>
+             </div>
+             <select
+               value={config.overlayEffect || 'None'}
+               onChange={(e) => setConfig(prev => ({ ...prev, overlayEffect: e.target.value }))}
+               disabled={config.bypassOverlays}
+               className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 focus:outline-none disabled:opacity-50"
+             >
+               <option value="None">None</option>
+               <option value="Classic Orbs">Classic Orbs</option>
+               <option value="Soft Bokeh">Soft Bokeh</option>
+               <option value="Twinkling Dust">Twinkling Dust</option>
+               <option value="Drifting Motes">Drifting Motes</option>
+               <option value="Cinematic Light Leaks">Cinematic Light Leaks</option>
+               <option value="Falling Snow/Ash">Falling Snow/Ash</option>
+               <option value="Starfield Hyperdrive">Starfield Hyperdrive</option>
+               <option value="Rolling Fog">Rolling Fog</option>
+               <option value="Gentle Smoke">Gentle Smoke</option>
+               <option value="Film Grain">Film Grain</option>
+               <option value="Lens Flare">Lens Flare</option>
+               <option value="VHS Glitch">VHS Glitch</option>
+               <option value="Camera Viewfinder">Camera Viewfinder</option>
+               <option value="Dust & Scratches">Dust & Scratches</option>
+               <option value="HUD">HUD</option>
+               <option value="Film Leader Countdown">Film Leader Countdown</option>
+               <option value="Grid Lines">Grid Lines</option>
+               <option value="Computer Code">Computer Code</option>
+               <option value="Rain">Rain</option>
+             </select>
+          </div>
           
           <div>
             <label className="block mb-1">Style</label>
@@ -399,7 +448,29 @@ export function SettingsPanel({
           <label className="block text-xs font-semibold uppercase text-zinc-500">Typography</label>
           
           <div>
-            <label className="block mb-1">Channel Name</label>
+            <div>
+            <label className="block mb-1">Font Family</label>
+            <select 
+              value={config.textFont}
+              onChange={(e) => setConfig(prev => ({ ...prev, textFont: e.target.value }))}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 focus:outline-none"
+            >
+              {GOOGLE_FONTS.map(f => (
+                 <option key={f.name} value={f.name}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block mb-1">Text Size ({config.textSize}%)</label>
+            <input 
+              type="range" 
+              min="20" max="200" step="5"
+              value={config.textSize}
+              onChange={(e) => setConfig(prev => ({ ...prev, textSize: parseInt(e.target.value) }))}
+              className="w-full"
+            />
+          </div>
+          <label className="block mb-1">Channel Name</label>
             <input 
               type="text" 
               value={config.channelName}

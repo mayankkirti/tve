@@ -24,7 +24,15 @@ export interface JobConfig {
   logoSize?: number;
   tracklistRaw?: string;
   textSize?: number;
+  textFont?: string;
+  bgMediaStyle?: string;
+  overlayEffect?: string;
+  bypassOverlays?: boolean;
   overlayOpacity?: number;
+  bgZoomEnabled?: boolean;
+  bgZoomLevel?: number;
+  brightnessEnabled?: boolean;
+  brightnessLevel?: number;
 }
 
 export interface RenderJobState {
@@ -201,7 +209,12 @@ export async function startRenderJob(id: string, config: JobConfig) {
     command = command.input(finalAudioPath);
 
     // Make sure we have a background
-    const bgScale = `scale=${config.width}:${config.height}:force_original_aspect_ratio=decrease,pad=${config.width}:${config.height}:(ow-iw)/2:(oh-ih)/2`;
+    let bgScale = `scale=${config.width}:${config.height}:force_original_aspect_ratio=decrease,pad=${config.width}:${config.height}:(ow-iw)/2:(oh-ih)/2`;
+    // FFMPEG can't do true audio-reactive zoom easily, but we can simulate the zoom
+    if (config.bgZoomEnabled) {
+       const zspeed = (config.bgZoomLevel || 50) / 10000;
+       bgScale += `,zoompan=z='min(zoom+${zspeed},1.5)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${config.width}x${config.height}`;
+    }
 
     let numBgInputs = 0;
     if (config.bgPaths.length > 0) {
@@ -218,8 +231,20 @@ export async function startRenderJob(id: string, config: JobConfig) {
     }
 
     if (config.logoPath && !fs.existsSync(config.logoPath)) {
+      const publicPath = require('path').join(process.cwd(), 'public', config.logoPath.replace('./', ''));
+      if (fs.existsSync(publicPath)) {
+          config.logoPath = publicPath;
+      }
+   }
+   if (config.logoPath && !fs.existsSync(config.logoPath)) {
+      const publicPath = require('path').join(process.cwd(), 'public', config.logoPath.replace('./', ''));
+      if (fs.existsSync(publicPath)) {
+          config.logoPath = publicPath;
+      }
+   }
+   if (config.logoPath && !fs.existsSync(config.logoPath)) {
       config.logoPath = undefined;
-    }
+   }
 
     const logoInputIndex = numBgInputs + 1;
     if (config.logoPath) {
@@ -272,9 +297,10 @@ export async function startRenderJob(id: string, config: JobConfig) {
         tracks.sort((a, b) => a.timeSeconds - b.timeSeconds);
       }
       
-      const K = config.bgPaths.length;
-      let segments = [];
-      if (tracks.length > 0) {
+      let segments = []; const K = numBgInputs;
+      if (K === 0) {
+        // No backgrounds
+      } else if (config.bgMediaStyle === 'tracklist' && tracks.length > 0) {
         for (let i = 0; i < tracks.length; i++) {
           segments.push({
             start: tracks[i].timeSeconds,
@@ -285,10 +311,31 @@ export async function startRenderJob(id: string, config: JobConfig) {
         if (tracks[0].timeSeconds > 0) {
           segments.unshift({ start: 0, end: tracks[0].timeSeconds, bgIndex: (K - 1) % K });
         }
+      } else if (K > 1) {
+        // Generate automatic segments based on style
+        // Random crossfade / hard cut / mix cuts / soft crossfade
+        // We simulate reactivity using lengths, hard cuts = 3s, soft = 6s, mix = 4s
+        let durationAvg = 4;
+        if (config.bgMediaStyle === 'hard-cut') durationAvg = 2.5;
+        if (config.bgMediaStyle === 'soft-crossfade') durationAvg = 6;
+        if (config.bgMediaStyle === 'random-crossfade') durationAvg = 5;
+        
+        const finalDur = totalSeconds || 180;
+        let t = 0;
+        let pidx = -1;
+        while (t < finalDur) {
+           let rdur = durationAvg + (Math.random() * 2 - 1);
+           if (config.bgMediaStyle === 'mix-cuts') rdur = (Math.random() > 0.5) ? 2 : 6;
+           let nidx = Math.floor(Math.random() * K);
+           if (nidx === pidx) nidx = (nidx + 1) % K;
+           segments.push({ start: t, end: t + rdur, bgIndex: nidx });
+           t += rdur;
+           pidx = nidx;
+        }
       } else {
-        segments.push({ start: 0, end: 999999, bgIndex: 0 });
+        segments.push({ start: 0, end: totalSeconds || 999999, bgIndex: 0 });
       }
-      
+
       for (let i = 0; i < numBgInputs; i++) {
         filterComplex += `[${i+1}:v]${bgScale},format=yuv420p[scaled_bg${i}];`;
       }
@@ -296,7 +343,13 @@ export async function startRenderJob(id: string, config: JobConfig) {
       let sid = 0;
       for (const seg of segments) {
         const nextOut = `[base${sid}]`;
-        filterComplex += `${prevBgOut}[scaled_bg${seg.bgIndex}]overlay=enable='between(t,${seg.start},${seg.end})'${nextOut};`;
+        const isFade = config.bgMediaStyle === 'random-crossfade' || config.bgMediaStyle === 'soft-crossfade' || (config.bgMediaStyle === 'mix-cuts' && (seg.end - seg.start) > 4);
+        if (isFade) {
+           filterComplex += `[scaled_bg${seg.bgIndex}]format=yuva420p,fade=t=in:st=${seg.start}:d=1:alpha=1,fade=t=out:st=${seg.end-1}:d=1:alpha=1[faded${sid}];`;
+           filterComplex += `${prevBgOut}[faded${sid}]overlay=enable='between(t,${seg.start},${seg.end})'${nextOut};`;
+        } else {
+           filterComplex += `${prevBgOut}[scaled_bg${seg.bgIndex}]overlay=enable='between(t,${seg.start},${seg.end})'${nextOut};`;
+        }
         prevBgOut = nextOut;
         sid++;
       }
@@ -307,11 +360,32 @@ export async function startRenderJob(id: string, config: JobConfig) {
     }
 
     filterComplex += `[0:a]${vizFilter}[viz];`;
-
     let finalBgOut = '[bg]';
+
+        const overlayNoiseLevel = config.overlayEffect && (config.overlayEffect.includes('Grain') || config.overlayEffect.includes('Scratches') || config.overlayEffect.includes('Glitch')) ? 50 : 15;
+    
+    // We create a master audio-reactive mask if we need it
+    let needsAudioMask = (!config.bypassOverlays && ((config.overlayEffect && config.overlayEffect !== 'None') || config.brightnessEnabled));    if (needsAudioMask) {
+        // Create an audio reactive mask that flashes white with the beat
+        filterComplex += `[0:a]showwaves=s=256x256:mode=p2p:colors=white,boxblur=40:5,scale=${config.width}x${config.height}[a_mask];`;
+    }
+
+    if (!config.bypassOverlays && config.overlayEffect && config.overlayEffect !== 'None') {
+        filterComplex += `color=c=black:s=${config.width}x${config.height}:r=${config.fps},noise=alls=${overlayNoiseLevel}:allf=t+u[olay_base];`;
+        filterComplex += `[olay_base][a_mask]blend=all_mode=multiply[olay_reactive];`;
+        filterComplex += `${finalBgOut}[olay_reactive]blend=all_mode=screen:all_opacity=0.35[bgw_noise];`;
+        finalBgOut = '[bgw_noise]';
+    }
+
+    // Audio-reactive brightness
+    if (!config.bypassOverlays && config.brightnessEnabled) {
+        const brIntensity = (config.brightnessLevel || 50) / 100;
+        filterComplex += `${finalBgOut}[a_mask]blend=all_mode=screen:all_opacity=${brIntensity * 0.7}[bgw_bright];`;
+        finalBgOut = '[bgw_bright]';
+    }
+
     if (config.overlayOpacity !== undefined) {
-         let currentAlpha = config.overlayOpacity / 100;
-         filterComplex += `${finalBgOut}colorchannelmixer=rr=${1-currentAlpha}:gg=${1-currentAlpha}:bb=${1-currentAlpha}[bgdark];`;
+         filterComplex += `${finalBgOut}colorchannelmixer=rr=${1-config.overlayOpacity/100}:gg=${1-config.overlayOpacity/100}:bb=${1-config.overlayOpacity/100}[bgdark];`;
          finalBgOut = '[bgdark]';
     }
 
@@ -319,7 +393,7 @@ export async function startRenderJob(id: string, config: JobConfig) {
     if (config.style === "psychedelic") {
       filterComplex += `${finalBgOut}[viz]blend=all_mode=addition[bgviz];`;
     } else if (config.style === "minimal-fast") {
-      filterComplex += `${finalBgOut}[viz]overlay=(W-w)/2:H-h-50[bgviz];`;
+      filterComplex += `${finalBgOut}[viz]overlay=(W-w)/2:h-th-50[bgviz];`;
     } else {
       filterComplex += `${finalBgOut}[viz]overlay=(W-w)/2:(H-h)/2[bgviz];`;
     }
@@ -335,7 +409,8 @@ export async function startRenderJob(id: string, config: JobConfig) {
       filterComplex += `[bgviz]copy[final1];`;
     }
 
-    const fontPath = path.join(process.cwd(), "public", "font.ttf").replace(/\\/g, "/");
+    
+    let fontFile = 'font.ttf'; if (config.textFont) { const tf = config.textFont.replace(/ /g, '_') + '.ttf'; if (fs.existsSync(path.join(process.cwd(), 'public', tf))) fontFile = tf; } const fontPath = path.join(process.cwd(), 'public', fontFile).replace(/\\/g, '/');
     let prevOut = "[final1]";
     let filterIndex = 1;
     const tracklistFileCleanup = path.join(process.cwd(), `tracklist_${id}.txt`);
@@ -353,7 +428,7 @@ export async function startRenderJob(id: string, config: JobConfig) {
 
     if (config.tracklistRaw) {
        fs.writeFileSync(tracklistFileCleanup, config.tracklistRaw);
-       addTextOptions.push(`drawtext=fontfile='${fontPath}':textfile='${tracklistFileCleanup.replace(/\\/g, "/")}':fontcolor=white:fontsize=${Math.floor(24 * baseTextSize)}:x=50:y=H-h-50`);
+       addTextOptions.push(`drawtext=fontfile='${fontPath}':textfile='${tracklistFileCleanup.replace(/\\/g, "/")}':fontcolor=white:fontsize=${Math.floor(24 * baseTextSize)}:x=50:y=H-th-50`);
     }
 
     addTextOptions.forEach((drawtextStr) => {

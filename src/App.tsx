@@ -37,6 +37,9 @@ export const createDefaultConfig = (): VideoConfig => ({
   brightnessLevel: 50,
   channelName: 'Trisha Frequencies',
   albumName: '',
+  bgMediaStyle: 'mix-cuts',
+  overlayEffect: 'None',
+  bypassOverlays: false,
 });
 
 export default function App() {

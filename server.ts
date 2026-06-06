@@ -369,12 +369,20 @@ app.post("/api/render", (req, res) => {
     
     audioPath: resolveServerPath(config.audioPath),
     bgPaths: (config.bgPaths || config.backgroundImages || []).map(resolveServerPath),
-    logoPath: config.logoPath ? resolveServerPath(config.logoPath) : undefined,
+    logoPath: config.logoUrl ? resolveServerPath(config.logoUrl) : undefined,
 
     logoSize: config.logoSize || 100,
     tracklistRaw: config.tracklistRaw || '',
     textSize: config.textSize || 100,
+    textFont: config.textFont || 'Inter',
     overlayOpacity: config.overlayOpacity !== undefined ? config.overlayOpacity : 50,
+    bgMediaStyle: config.bgMediaStyle || 'tracklist',
+    overlayEffect: config.overlayEffect || 'None',
+    bypassOverlays: config.bypassOverlays || false,
+    bgZoomEnabled: config.bgZoomEnabled || false,
+    bgZoomLevel: config.bgZoomLevel || 0,
+    brightnessEnabled: config.brightnessEnabled || false,
+    brightnessLevel: config.brightnessLevel || 0,
   });
 
   res.json({ jobId });

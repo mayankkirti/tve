@@ -40,6 +40,9 @@ export interface VideoConfig {
   brightnessLevel: number; // 15, 20, 24, 30, 60
   channelName: string;
   albumName: string;
+  bgMediaStyle?: 'tracklist' | 'random-crossfade' | 'hard-cut' | 'soft-crossfade' | 'mix-cuts';
+  overlayEffect?: string;
+  bypassOverlays?: boolean;
 }
 
 export interface RenderJob {
