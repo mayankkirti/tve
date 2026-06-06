@@ -148,6 +148,19 @@ export function QueuePanel({
                   {job.status === 'paused' && <span className="text-yellow-400">Paused</span>}
                 </div>
 
+                {job.status === 'completed' && job.blobUrl && (
+                  <div className="flex gap-2">
+                    <a 
+                      href={job.blobUrl} 
+                      download={job.config.name ? `${job.config.name}.mp4` : 'video.mp4'}
+                      className="flex-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 py-1.5 rounded flex items-center justify-center gap-2 text-xs font-medium transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      Download Video
+                    </a>
+                    <YouTubeUploader job={job} />
+                  </div>
+                )}
                 
                 {job.status === 'rendering' && (
                   <button 

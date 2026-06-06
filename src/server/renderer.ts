@@ -143,6 +143,12 @@ export async function startRenderJob(id, config) {
       console.log("FFmpeg duration parse error:", e);
     }
     let command = ffmpeg();
+    try {
+      execSync(`"${ffmpegInstaller.path}" -v error -i "${finalAudioPath}" -t 1 -f null -`, {encoding: "utf8"});
+    } catch(e: any) {
+      console.log("Probe err:", e.message);
+      throw new Error("Audio file is missing or invalid format (Could be a Google Drive auth page or corrupted file). Please make sure the file is valid media and public.");
+    }
     command = command.input(finalAudioPath);
     let bgScale = `scale=${config.width}:${config.height}:force_original_aspect_ratio=decrease,pad=${config.width}:${config.height}:(ow-iw)/2:(oh-ih)/2`;
     if (config.bgZoomEnabled) {
@@ -395,7 +401,7 @@ export async function startRenderJob(id, config) {
       activeRenderThreads--;
       delete activeCommands[id];
       console.error("FFmpeg error:", err);
-      jobs[id].status = "error";
+      jobs[id].status = "failed";
       jobs[id].error = err.message;
       try {
         const tracklistFileCleanup2 = path.join(process.cwd(), `tracklist_${id}.txt`);
@@ -407,7 +413,7 @@ export async function startRenderJob(id, config) {
     activeCommands[id] = command;
   } catch (error) {
     if (activeRenderThreads > 0) activeRenderThreads--;
-    jobs[id].status = "error";
+    jobs[id].status = "failed";
     jobs[id].error = error.message;
   }
 }

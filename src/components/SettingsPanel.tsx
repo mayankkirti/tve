@@ -82,10 +82,14 @@ export function SettingsPanel({
 
        let newConfig = { ...config };
        if (config.audioUrl && config.audioUrl.startsWith('blob:')) {
-          newConfig.audioUrl = await doUpload(config.audioUrl, 'audio.mp3');
+          const originalName = config.audioUrl.split('#')[1] ? decodeURIComponent(config.audioUrl.split('#')[1]) : 'audio.mp3';
+          const cleanUrl = config.audioUrl.split('#')[0];
+          newConfig.audioUrl = await doUpload(cleanUrl, originalName);
        }
        if (config.logoUrl && config.logoUrl.startsWith('blob:')) {
-          newConfig.logoUrl = await doUpload(config.logoUrl, 'logo.png');
+          const originalName = config.logoUrl.split('#')[1] ? decodeURIComponent(config.logoUrl.split('#')[1]) : 'logo.png';
+          const cleanUrl = config.logoUrl.split('#')[0];
+          newConfig.logoUrl = await doUpload(cleanUrl, originalName);
        }
        
        let newBgs = [];
@@ -124,8 +128,14 @@ export function SettingsPanel({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, key: 'audioUrl' | 'logoUrl') => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setConfig(prev => ({ ...prev, [key]: url }));
+      const url = URL.createObjectURL(file) + '#' + encodeURIComponent(file.name);
+      setConfig(prev => {
+        const nextState = { ...prev, [key]: url };
+        if (key === 'audioUrl') {
+          nextState.name = file.name.replace(/\.[^/.]+$/, "");
+        }
+        return nextState;
+      });
     }
   };
 

@@ -304,7 +304,7 @@ app.post("/api/cleanup", (req, res) => {
     const job = jobs[id];
     if (job.status === "rendering") {
       killRenderJob(id);
-      job.status = "error";
+      job.status = "failed";
       job.error = "Cancelled by cleanup";
     }
     delete jobs[id];
@@ -415,7 +415,7 @@ app.post("/api/jobs/:id/cancel", (req, res) => {
   const job = jobs[req.params.id];
   if (job && job.status === "rendering") {
     killRenderJob(req.params.id);
-    job.status = "error";
+    job.status = "failed";
     job.error = "Cancelled by user";
   }
   res.json({ success: true });

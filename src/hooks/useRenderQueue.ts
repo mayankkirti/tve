@@ -308,11 +308,13 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
            serverConfig.audioPath = nextJob.config.audioUrl;
         } else {
            try {
-             const audioRes = await fetch(nextJob.config.audioUrl);
+             const cleanUrl = nextJob.config.audioUrl.split('#')[0];
+             const originalName = nextJob.config.audioUrl.split('#')[1] ? decodeURIComponent(nextJob.config.audioUrl.split('#')[1]) : 'audio.mp3';
+             const audioRes = await fetch(cleanUrl);
              const audioBlob = await audioRes.blob();
              filesToUpload.push({
                blob: audioBlob,
-               filename: "audio.mp3",
+               filename: originalName,
                assign: (p) => (serverConfig.audioPath = p),
              });
            } catch (e) {
