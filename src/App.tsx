@@ -135,9 +135,9 @@ export default function App() {
             >
                  {config.backgroundImages.length > 0 ? (
                     config.backgroundImages[0].endsWith('#video') ? (
-                       <video src={config.backgroundImages[0]?.includes('/uploads/') ? '/api/uploads/' + config.backgroundImages[0].split('/uploads/').pop().replace('#video', '').replace('#image', '') : config.backgroundImages[0]} className="absolute inset-0 w-full h-full object-cover opacity-30" autoPlay loop muted playsInline volume={0} />
+                       <video src={config.backgroundImages[0]?.includes('/uploads/') ? '/api/uploads/' + config.backgroundImages[0].split('/uploads/').pop().replace('#video', '').replace('#image', '') : config.backgroundImages[0]} className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 1 - (config.overlayOpacity !== undefined ? config.overlayOpacity / 100 : 0.5) }} autoPlay loop muted playsInline volume={0} />
                     ) : (
-                       <img src={config.backgroundImages[0]?.includes('/uploads/') ? '/api/uploads/' + config.backgroundImages[0].split('/uploads/').pop() : config.backgroundImages[0]} className="absolute inset-0 w-full h-full object-cover opacity-30" alt="Background preview" />
+                       <img src={config.backgroundImages[0]?.includes('/uploads/') ? '/api/uploads/' + config.backgroundImages[0].split('/uploads/').pop() : config.backgroundImages[0]} className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 1 - (config.overlayOpacity !== undefined ? config.overlayOpacity / 100 : 0.5) }} alt="Background preview" />
                     )
                  ) : (
                     <div className="absolute inset-0 w-full h-full bg-zinc-950 opacity-80" />

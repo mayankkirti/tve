@@ -328,13 +328,66 @@ export function SettingsPanel({
           </div>
 
           <div>
-            <label className="block mb-1">Reactivity Level ({Math.round(config.reactivity * 100)}%)</label>
+            <label className="block mb-1">Visualizer Reactivity ({Math.round(config.reactivity * 100)}%)</label>
             <input 
               type="range" 
               min="0" max="1" step="0.05"
               value={config.reactivity}
               onChange={(e) => setConfig(prev => ({ ...prev, reactivity: parseFloat(e.target.value) }))}
               className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1">Black Overlay Opacity ({config.overlayOpacity}%)</label>
+            <input 
+              type="range" 
+              min="0" max="100" step="1"
+              value={config.overlayOpacity}
+              onChange={(e) => setConfig(prev => ({ ...prev, overlayOpacity: parseInt(e.target.value) }))}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block">BG Zoom (Audio Reactive) ({config.bgZoomLevel}%)</label>
+              <button
+                type="button"
+                onClick={() => setConfig(prev => ({ ...prev, bgZoomEnabled: !prev.bgZoomEnabled }))}
+                className={`text-xs px-2 py-1 rounded transition-colors ${config.bgZoomEnabled ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'}`}
+              >
+                {config.bgZoomEnabled ? 'Enabled' : 'Disabled'}
+              </button>
+            </div>
+            <input 
+              type="range" 
+              min="0" max="100" step="1"
+              value={config.bgZoomLevel}
+              disabled={!config.bgZoomEnabled}
+              onChange={(e) => setConfig(prev => ({ ...prev, bgZoomLevel: parseInt(e.target.value) }))}
+              className={`w-full ${!config.bgZoomEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block">Brightness (Audio Reactive) ({config.brightnessLevel}%)</label>
+              <button
+                type="button"
+                onClick={() => setConfig(prev => ({ ...prev, brightnessEnabled: !prev.brightnessEnabled }))}
+                className={`text-xs px-2 py-1 rounded transition-colors ${config.brightnessEnabled ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'}`}
+              >
+                {config.brightnessEnabled ? 'Enabled' : 'Disabled'}
+              </button>
+            </div>
+            <input 
+              type="range" 
+              min="0" max="100" step="1"
+              value={config.brightnessLevel}
+              disabled={!config.brightnessEnabled}
+              onChange={(e) => setConfig(prev => ({ ...prev, brightnessLevel: parseInt(e.target.value) }))}
+              className={`w-full ${!config.brightnessEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             />
           </div>
 
