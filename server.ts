@@ -110,7 +110,6 @@ setInterval(() => {
   saveJobs(jobs);
 }, 5000);
 
-import { systemConfig } from "./src/server/config";
 
 app.get("/api/settings", (req, res) => {
   res.json({ diskLimitMB: systemConfig.diskLimitMB });
@@ -338,6 +337,7 @@ app.post("/api/cleanup", (req, res) => {
   });
 });
 
+
 app.post("/api/render", (req, res) => {
   const config = req.body;
 
@@ -345,9 +345,19 @@ app.post("/api/render", (req, res) => {
     return res.status(400).json({ error: "Missing audio configuration" });
   }
 
+  const resolveServerPath = (p) => {
+      if (typeof p !== 'string') return p;
+      let cleanP = p.split('#')[0]; // Remove #video etc
+      if (cleanP.includes('/api/uploads/')) {
+         return require('path').join(process.cwd(), "uploads", cleanP.split('/uploads/').pop());
+      }
+      return cleanP;
+  };
+
   const jobId = uuidv4();
 
   startRenderJob(jobId, {
+
     channelName: config.channelName,
     songName: config.songName,
     artistName: config.artistName,
@@ -356,9 +366,11 @@ app.post("/api/render", (req, res) => {
     fps: config.fps || 30,
     width: config.resolution?.width || 1280,
     height: config.resolution?.height || 720,
-    audioPath: config.audioPath,
-    bgPaths: config.bgPaths || [],
-    logoPath: config.logoPath,
+    
+    audioPath: resolveServerPath(config.audioPath),
+    bgPaths: (config.bgPaths || []).map(resolveServerPath),
+    logoPath: config.logoPath ? resolveServerPath(config.logoPath) : undefined,
+
     logoSize: config.logoSize || 100,
     tracklistRaw: config.tracklistRaw || '',
     textSize: config.textSize || 100,

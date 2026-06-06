@@ -41,7 +41,7 @@ export interface RenderJob {
   id: string;
   backendId?: string;
   config: VideoConfig;
-  status: 'queued' | 'uploading' | 'rendering' | 'completed' | 'failed' | 'killed';
+  status: 'queued' | 'uploading' | 'rendering' | 'completed' | 'failed' | 'killed' | 'paused';
   progress: number; // 0 to 100
   startTime?: number;
   endTime?: number;

@@ -33,6 +33,7 @@ export interface RenderJobState {
   status: "rendering" | "completed" | "error" | "paused";
   error?: string;
   outputPath?: string;
+  uploadedToYouTube?: boolean;
 }
 
 export const jobs: Record<string, RenderJobState> = loadJobs();

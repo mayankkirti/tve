@@ -323,41 +323,25 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
         throw new Error("Audio track missing");
       }
 
+      
       if (nextJob.config.logoUrl) {
-        try {
-          const logoRes = await fetch(nextJob.config.logoUrl);
-          const logoBlob = await logoRes.blob();
-          filesToUpload.push({
-            blob: logoBlob,
-            filename: "logo.png",
-            assign: (p) => (serverConfig.logoPath = p),
-          });
-        } catch (e) {
-          // ignore
+        if (!nextJob.config.logoUrl.startsWith('blob:') && !nextJob.config.logoUrl.startsWith('http') && !nextJob.config.logoUrl.startsWith('/api/proxy-flow/')) {
+           serverConfig.logoPath = nextJob.config.logoUrl;
+        } else {
+            try {
+              const logoRes = await fetch(nextJob.config.logoUrl);
+              const logoBlob = await logoRes.blob();
+              filesToUpload.push({
+                blob: logoBlob,
+                filename: "logo.png",
+                assign: (p) => (serverConfig.logoPath = p),
+              });
+            } catch (e) {
+              // ignore
+            }
         }
       }
 
-      serverConfig.bgPaths = [];
-      for (let i = 0; i < nextJob.config.backgroundImages.length; i++) {
-        if (isCancelled) throw new Error("Killed by user");
-        try {
-          const bgUrl = nextJob.config.backgroundImages[i];
-          const isVideo = bgUrl.endsWith("#video");
-          const urlToFetch = isVideo ? bgUrl.replace("#video", "") : bgUrl;
-          const bgRes = await fetch(urlToFetch);
-          const bgBlob = await bgRes.blob();
-          const ext = isVideo
-            ? bgBlob.type === "video/mp4" || urlToFetch.endsWith(".mp4")
-              ? "mp4"
-              : "webm"
-            : "png";
-          filesToUpload.push({
-            blob: bgBlob,
-            filename: `bg_${i}.${ext}`,
-            assign: (p) => serverConfig.bgPaths.push(p),
-          });
-        } catch (e) {}
-      }
 
       totalBytesToUpload = filesToUpload.reduce(
         (acc, f) => acc + f.blob.size,

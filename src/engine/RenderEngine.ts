@@ -266,7 +266,7 @@ export async function renderVideoTask(
       const ctx = canvas.getContext('2d', { alpha: false })!;
 
       const particles: Particle[] = [];
-      if (config.style !== 'minimal-fast' && config.style !== 'indian-ambient') {
+      if (config.style !== 'minimal-fast') {
           const numParticles = config.style === 'abstract' ? 20 : (config.style === 'psychedelic' ? 300 : (config.style === 'indian-ambient' ? 150 : 100));
           for (let i = 0; i < numParticles; i++) {
             particles.push(new Particle(canvas.width, canvas.height, config.style));
@@ -620,7 +620,7 @@ export async function renderVideoTask(
             ctx.restore();
          }
 
-         if (config.style !== 'minimal-fast' && config.style !== 'indian-ambient') {
+         if (config.style !== 'minimal-fast') {
              ctx.save();
              if (config.style === 'chillout') {
                 ctx.fillStyle = `rgba(0, 0, 0, ${0.3 - normalizedReactivity * 0.2})`;

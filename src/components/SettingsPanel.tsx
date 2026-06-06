@@ -62,6 +62,7 @@ export function SettingsPanel({
               formData.append('filename', originalFilename);
               formData.append('chunk', chunk, 'chunk');
               
+              
               let retries = 3;
               while(retries-- > 0) {
                  const res = await fetch('/api/upload-chunk', {
@@ -71,14 +72,12 @@ export function SettingsPanel({
                  });
                  if (res.ok) {
                     const data = await res.json();
-                    if (data.path) return data.path;
+                    if (data.fileId) return '/api/uploads/' + data.fileId;
                     break; // break retry loop, move to next chunk
                  }
               }
            }
-           // removed status fetch
-           const finalData = await finalRes.json();
-           return finalData.path; // Or we can rely on last chunk returning path
+           throw new Error('Upload failed to complete'); // Or we can rely on last chunk returning path
        };
 
        let newConfig = { ...config };
