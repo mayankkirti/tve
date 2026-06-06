@@ -30,6 +30,11 @@ export const createDefaultConfig = (): VideoConfig => ({
   textFont: 'Inter',
   resolution: RESOLUTIONS[2], // Default to 1080p now since it's 3rd
   fps: 30, // Default to 30 FPS
+  overlayOpacity: 50,
+  bgZoomEnabled: true,
+  bgZoomLevel: 50,
+  brightnessEnabled: true,
+  brightnessLevel: 50,
   channelName: 'Trisha Frequencies',
   albumName: '',
 });

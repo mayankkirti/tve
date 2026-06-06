@@ -540,10 +540,17 @@ export async function renderVideoTask(
             }
             
             ctx.save();
+            let finalScale = 1;
+
+            if (config.bgZoomEnabled && config.bgZoomLevel > 0) {
+                finalScale += (normalizedReactivity * config.bgZoomLevel / 800);
+            }
+
             if (config.style === 'party-flash' || config.style === 'chillout-flash') {
                 // perspective shift, hue shift color tails, bounce blast delay blur glitch
                 let blastScale = 1 + (normalizedReactivity * 0.3); // Bounce bump
                 if (config.style === 'chillout-flash') blastScale = 1 + (normalizedReactivity * 0.1);
+                finalScale *= blastScale;
                 
                 if (partyGlitch) {
                     if (config.style === 'party-flash') {
@@ -554,10 +561,14 @@ export async function renderVideoTask(
                 }
 
                 ctx.translate(canvas.width/2, canvas.height/2);
-                ctx.scale(blastScale, blastScale);
+                ctx.scale(finalScale, finalScale);
                 // vibration effect
                 let vibration = config.style === 'chillout-flash' ? 2 : 10;
                 ctx.translate((Math.random()-0.5)*vibration*normalizedReactivity, (Math.random()-0.5)*vibration*normalizedReactivity);
+                ctx.translate(-canvas.width/2, -canvas.height/2);
+            } else if (finalScale > 1) {
+                ctx.translate(canvas.width/2, canvas.height/2);
+                ctx.scale(finalScale, finalScale);
                 ctx.translate(-canvas.width/2, -canvas.height/2);
             }
 
@@ -582,9 +593,26 @@ export async function renderVideoTask(
             ctx.fillRect(0, 0, canvas.width, canvas.height);
          }
 
-         // Universal background darkening to highlight text
-         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+         // Universal background darkening and audio brightness
+         let currentOverlayAlpha = config.overlayOpacity !== undefined ? config.overlayOpacity / 100 : 0.5;
+         
+         if (config.brightnessEnabled && config.brightnessLevel > 0) {
+              const audioLight = normalizedReactivity * (config.brightnessLevel / 100);
+              currentOverlayAlpha = Math.max(0, currentOverlayAlpha - audioLight);
+         }
+
+         ctx.fillStyle = `rgba(0, 0, 0, ${currentOverlayAlpha})`;
          ctx.fillRect(0, 0, canvas.width, canvas.height);
+         
+         // If brightness is even stronger than making overlay transparent, add white flashes!
+         if (config.brightnessEnabled && config.brightnessLevel > 0) {
+              const audioLight = normalizedReactivity * (config.brightnessLevel / 100);
+              const extraWhite = audioLight - (config.overlayOpacity !== undefined ? config.overlayOpacity / 100 : 0.5);
+              if (extraWhite > 0) {
+                  ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, extraWhite * 0.5)})`;
+                  ctx.fillRect(0, 0, canvas.width, canvas.height);
+              }
+         }
 
          // Floating thin ray of light (center-left to center-right)
          ctx.save();

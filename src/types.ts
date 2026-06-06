@@ -32,7 +32,12 @@ export interface VideoConfig {
   textSize: number; // e.g. 16 to 100
   textFont: string;
   resolution: Resolution;
-  fps: number; // 15, 20, 24, 30, 60
+  fps: number;
+  overlayOpacity: number;
+  bgZoomEnabled: boolean;
+  bgZoomLevel: number;
+  brightnessEnabled: boolean;
+  brightnessLevel: number; // 15, 20, 24, 30, 60
   channelName: string;
   albumName: string;
 }

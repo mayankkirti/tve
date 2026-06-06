@@ -24,6 +24,7 @@ export interface JobConfig {
   logoSize?: number;
   tracklistRaw?: string;
   textSize?: number;
+  overlayOpacity?: number;
 }
 
 export interface RenderJobState {
@@ -307,13 +308,20 @@ export async function startRenderJob(id: string, config: JobConfig) {
 
     filterComplex += `[0:a]${vizFilter}[viz];`;
 
+    let finalBgOut = '[bg]';
+    if (config.overlayOpacity !== undefined) {
+         let currentAlpha = config.overlayOpacity / 100;
+         filterComplex += `${finalBgOut}colorchannelmixer=rr=${1-currentAlpha}:gg=${1-currentAlpha}:bb=${1-currentAlpha}[bgdark];`;
+         finalBgOut = '[bgdark]';
+    }
+
     // Blend background and visualizer based on style
     if (config.style === "psychedelic") {
-      filterComplex += `[bg][viz]blend=all_mode=addition[bgviz];`;
+      filterComplex += `${finalBgOut}[viz]blend=all_mode=addition[bgviz];`;
     } else if (config.style === "minimal-fast") {
-      filterComplex += `[bg][viz]overlay=(W-w)/2:H-h-50[bgviz];`;
+      filterComplex += `${finalBgOut}[viz]overlay=(W-w)/2:H-h-50[bgviz];`;
     } else {
-      filterComplex += `[bg][viz]overlay=(W-w)/2:(H-h)/2[bgviz];`;
+      filterComplex += `${finalBgOut}[viz]overlay=(W-w)/2:(H-h)/2[bgviz];`;
     }
 
     // Add Logo
@@ -339,13 +347,13 @@ export async function startRenderJob(id: string, config: JobConfig) {
     const escapeText = (t) => t.replace(/'/g, "\\\'").replace(/:/g, "\\:");
 
     if (config.channelName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.channelName)}':fontcolor=white:fontsize=${Math.floor(40 * baseTextSize)}:x=50:y=100`);
-    if (config.albumName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.albumName)}':fontcolor=white:fontsize=${Math.floor(30 * baseTextSize)}:x=50:y=h-100`);
-    if (config.songName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.songName)}':fontcolor=white:fontsize=${Math.floor(50 * baseTextSize)}:x=50:y=h-200`);
-    if (config.artistName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='By ${escapeText(config.artistName)}':fontcolor=white:fontsize=${Math.floor(30 * baseTextSize)}:x=50:y=h-150`);
+    if (config.albumName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.albumName)}':fontcolor=white:fontsize=${Math.floor(30 * baseTextSize)}:x=50:y=H-100`);
+    if (config.songName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.songName)}':fontcolor=white:fontsize=${Math.floor(50 * baseTextSize)}:x=50:y=H-200`);
+    if (config.artistName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='By ${escapeText(config.artistName)}':fontcolor=white:fontsize=${Math.floor(30 * baseTextSize)}:x=50:y=H-150`);
 
     if (config.tracklistRaw) {
        fs.writeFileSync(tracklistFileCleanup, config.tracklistRaw);
-       addTextOptions.push(`drawtext=fontfile='${fontPath}':textfile='${tracklistFileCleanup.replace(/\\/g, "/")}':fontcolor=white:fontsize=${Math.floor(24 * baseTextSize)}:x=w-400:y=200`);
+       addTextOptions.push(`drawtext=fontfile='${fontPath}':textfile='${tracklistFileCleanup.replace(/\\/g, "/")}':fontcolor=white:fontsize=${Math.floor(24 * baseTextSize)}:x=50:y=H-h-50`);
     }
 
     addTextOptions.forEach((drawtextStr) => {
