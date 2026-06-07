@@ -263,7 +263,7 @@ export async function startRenderJob(id, config) {
         segments.push({ start: 0, end: totalSeconds || 999999, bgIndex: 0 });
       }
       for (let i = 0; i < numBgInputs; i++) {
-        filterComplex += `[${i + 1}:v]${bgScale},format=yuv420p[scaled_bg${i}];`;
+        filterComplex += `[${i + 1}]${bgScale},format=yuv420p[scaled_bg${i}];`;
       }
       let sid = 0;
       for (const seg of segments) {
@@ -315,7 +315,7 @@ export async function startRenderJob(id, config) {
       const sizeVal = config.logoSize || 100;
       const targetW = Math.floor(120 * (sizeVal / 100));
       const w = targetW + targetW % 2;
-      filterComplex += `[${logoInputIndex}:v]scale=${w}:-1[logo];`;
+      filterComplex += `[${logoInputIndex}]scale=${w}:-1[logo];`;
       filterComplex += `[bgviz][logo]overlay=W-w-50:50[final1];`;
     } else {
       filterComplex += `[bgviz]copy[final1];`;
