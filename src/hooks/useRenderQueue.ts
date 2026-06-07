@@ -311,6 +311,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
              const cleanUrl = nextJob.config.audioUrl.split('#')[0];
              const originalName = nextJob.config.audioUrl.split('#')[1] ? decodeURIComponent(nextJob.config.audioUrl.split('#')[1]) : 'audio.mp3';
              const audioRes = await fetch(cleanUrl);
+             if (!audioRes.ok) throw new Error("bad audio");
              const audioBlob = await audioRes.blob();
              filesToUpload.push({
                blob: audioBlob,
@@ -332,6 +333,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
         } else {
             try {
               const logoRes = await fetch(nextJob.config.logoUrl);
+              if (!logoRes.ok) throw new Error("bad logo");
               const logoBlob = await logoRes.blob();
               filesToUpload.push({
                 blob: logoBlob,
@@ -342,6 +344,33 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
               // ignore
             }
         }
+      }
+
+      serverConfig.backgroundImages = [];
+      if (nextJob.config.backgroundImages && nextJob.config.backgroundImages.length > 0) {
+        for (let i = 0; i < nextJob.config.backgroundImages.length; i++) {
+           const bg = nextJob.config.backgroundImages[i];
+           if (!bg.startsWith('blob:') && !bg.startsWith('http') && !bg.startsWith('/api/proxy-flow/')) {
+              serverConfig.backgroundImages[i] = bg;
+           } else {
+              try {
+                const cleanUrl = bg.split('#')[0];
+                const isVideo = bg.endsWith('#video');
+                const bgRes = await fetch(cleanUrl);
+                if (!bgRes.ok) throw new Error("Bad bg fetch");
+                const bgBlob = await bgRes.blob();
+                filesToUpload.push({
+                  blob: bgBlob,
+                  filename: isVideo ? `bg_${i}.mp4` : `bg_${i}.jpg`,
+                  assign: (p) => (serverConfig.backgroundImages[i] = p + (isVideo ? '#video' : '#image')),
+                });
+              } catch (e) {
+                 // ignore, but this background will be missing
+              }
+           }
+        }
+        // Remove empty spots if any fetch failed
+        serverConfig.backgroundImages = serverConfig.backgroundImages.filter(Boolean);
       }
 
 
