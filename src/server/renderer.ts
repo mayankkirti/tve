@@ -315,7 +315,7 @@ export async function startRenderJob(id, config) {
       const sizeVal = config.logoSize || 100;
       const targetW = Math.floor(120 * (sizeVal / 100));
       const w = targetW + targetW % 2;
-      filterComplex += `[${logoInputIndex}]scale=${w}:-1[logo];`;
+      filterComplex += `[${logoInputIndex}:v]scale=${w}:-1[logo];`;
       filterComplex += `[bgviz][logo]overlay=W-w-50:50[final1];`;
     } else {
       filterComplex += `[bgviz]copy[final1];`;
