@@ -309,7 +309,7 @@ export function SettingsPanel({
 
           <label className="flex items-center gap-2 p-3 bg-zinc-800 hover:bg-zinc-700 rounded cursor-pointer border border-zinc-700 transition-colors">
             <ImageIcon className="w-4 h-4 text-zinc-300" />
-            <span className="flex-1 truncate text-zinc-300">{config.logoUrl ? 'Logo Selected' : 'Upload Logo'}</span>
+            <span className="flex-1 truncate text-zinc-300">{(config.logoUrl && config.logoUrl !== './logo.png' && config.logoUrl !== '/logo.png') ? 'Logo Selected' : 'Upload Logo'}</span>
             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'logoUrl')} />
           </label>
 
