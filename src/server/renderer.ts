@@ -10,7 +10,7 @@ const activeCommands = {};
 let activeRenderThreads = 0;
 const MAX_CONCURRENT_RENDERS = 2;
 async function checkBackpressure() {
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     const check = () => {
       if (activeRenderThreads < MAX_CONCURRENT_RENDERS) {
         resolve();
@@ -90,7 +90,7 @@ function checkAndFreeDiskSpace() {
   }
 }
 export async function startRenderJob(id, config) {
-  jobs[id] = { id, progress: 0, status: "rendering" };
+  jobs[id] = { id, progress: 0, status: "rendering", config, createdAt: Date.now() };
   const outputPath = path.join(process.cwd(), "uploads", `${id}.mp4`);
   try {
     checkAndFreeDiskSpace();
@@ -323,7 +323,26 @@ export async function startRenderJob(id, config) {
     let fontFile = "font.ttf";
     if (config.textFont) {
       const tf = config.textFont.replace(/ /g, "_") + ".ttf";
-      if (fs.existsSync(path.join(process.cwd(), "public", tf))) fontFile = tf;
+      const tfPath = path.join(process.cwd(), "public", tf);
+      if (!fs.existsSync(tfPath)) {
+        try {
+          const fontCssRes = await fetch(`https://fonts.googleapis.com/css?family=${encodeURIComponent(config.textFont)}`, {
+            headers: { 'User-Agent': 'curl/7.64.1' }
+          });
+          const fontCss = await fontCssRes.text();
+          const ttfMatch = fontCss.match(/url\((https:\/\/[^)]+\.ttf)\)/);
+          if (ttfMatch) {
+             const ttfRes = await fetch(ttfMatch[1]);
+             const buffer = await ttfRes.arrayBuffer();
+             fs.writeFileSync(tfPath, Buffer.from(buffer));
+             fontFile = tf;
+          }
+        } catch(e) {
+          console.error("Font fetch failed:", e);
+        }
+      } else {
+        fontFile = tf;
+      }
     }
     const fontPath = path.join(process.cwd(), "public", fontFile).replace(/\\/g, "/");
     let prevOut = "[final1]";

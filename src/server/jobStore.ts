@@ -1,10 +1,20 @@
 import fs from 'fs';
 import path from 'path';
-import type { RenderJobState } from './renderer';
+
+export interface RenderJobState {
+  id: string;
+  status: "pending" | "rendering" | "processing" | "completed" | "failed" | "error" | "paused";
+  config: any;
+  progress: number;
+  error?: string;
+  createdAt: number;
+  outputPath?: string;
+  outputFile?: string;
+  timemark?: string;
+  uploadedToYouTube?: boolean;
+}
 
 const storePath = path.join(process.cwd(), 'jobs.json');
-
-export type { RenderJobState };
 
 export function loadJobs(): Record<string, RenderJobState> {
     try {

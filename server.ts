@@ -369,7 +369,7 @@ app.post("/api/render", (req, res) => {
     
     audioPath: resolveServerPath(config.audioPath),
     bgPaths: (config.bgPaths || config.backgroundImages || []).map(resolveServerPath),
-    logoPath: config.logoUrl ? resolveServerPath(config.logoUrl) : undefined,
+    logoPath: config.logoPath ? resolveServerPath(config.logoPath) : config.logoUrl ? resolveServerPath(config.logoUrl) : undefined,
 
     logoSize: config.logoSize || 100,
     tracklistRaw: config.tracklistRaw || '',
