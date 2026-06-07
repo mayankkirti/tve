@@ -280,7 +280,7 @@ export async function startRenderJob(id, config) {
       }
       filterComplex += `${prevBgOut}copy[bg];`;
     } else {
-      filterComplex += `[1:v]${bgScale},format=yuv420p[bg];`;
+      filterComplex += `[1]${bgScale},format=yuv420p[bg];`;
     }
     filterComplex += `[0:a]${vizFilter}[viz];`;
     let finalBgOut = "[bg]";
