@@ -16,7 +16,9 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 const PORT = 3000;
 
 // Authentication Management
-const activeTokens = new Set<string>();
+let activeTokens = new Set<string>();
+try { if (fs.existsSync('active_tokens.json')) activeTokens = new Set(JSON.parse(fs.readFileSync('active_tokens.json', 'utf8'))); } catch(e){}
+const saveTokens = () => fs.writeFileSync('active_tokens.json', JSON.stringify([...activeTokens]));
 
 const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (req.path === '/api/login' || req.path === '/api/verify-mfa' || !req.path.startsWith('/api')) {
@@ -63,7 +65,7 @@ app.post("/api/verify-mfa", (req, res) => {
   const isValid = verifySync({ token: code, secret: systemConfig.totpSecret }).valid;
   if (isValid) {
      const token = uuidv4();
-     activeTokens.add(token);
+     activeTokens.add(); saveTokens();
      res.json({ token });
   } else {
      res.status(401).json({ error: "Invalid code" });
@@ -534,7 +536,7 @@ app.post("/api/jobs/:id/youtube", async (req, res) => {
 });
 
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && !process.env.PM2_HOME) { // If running in PM2, default to production
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
