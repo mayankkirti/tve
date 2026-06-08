@@ -198,11 +198,15 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
               continue;
             }
             if (!res.ok) {
-  console.error('Upload error', res.status, await res.text());
-  retries--;
-  await new Promise((r) => setTimeout(r, 2000));
-  continue;
-}
+              if (res.status === 401) {
+                localStorage.removeItem('auth_token');
+                window.location.reload();
+              }
+              console.error('Upload error', res.status, await res.text());
+              retries--;
+              await new Promise((r) => setTimeout(r, 2000));
+              continue;
+            }
             try {
               const text = await res.text();
               data = JSON.parse(text);
@@ -260,11 +264,15 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
             }
 
             if (!res.ok) {
-  console.error('Upload error', res.status, await res.text());
-  retries--;
-  await new Promise((r) => setTimeout(r, 2000));
-  continue;
-}
+              if (res.status === 401) {
+                localStorage.removeItem('auth_token');
+                window.location.reload();
+              }
+              console.error('Upload error', res.status, await res.text());
+              retries--;
+              await new Promise((r) => setTimeout(r, 2000));
+              continue;
+            }
 
             try {
               const text = await res.text();
