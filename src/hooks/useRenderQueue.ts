@@ -318,7 +318,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
            try {
              const cleanUrl = nextJob.config.audioUrl.split('#')[0];
              const originalName = nextJob.config.audioUrl.split('#')[1] ? decodeURIComponent(nextJob.config.audioUrl.split('#')[1]) : 'audio.mp3';
-             const audioRes = await fetch(cleanUrl);
+             const audioRes = await fetch(cleanUrl, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } });
              if (!audioRes.ok) throw new Error("bad audio");
              const audioBlob = await audioRes.blob();
              filesToUpload.push({
@@ -340,7 +340,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
            serverConfig.logoPath = nextJob.config.logoUrl;
         } else {
             try {
-              const logoRes = await fetch(nextJob.config.logoUrl);
+              const logoRes = await fetch(nextJob.config.logoUrl, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } });
               if (!logoRes.ok) throw new Error("bad logo");
               const logoBlob = await logoRes.blob();
               filesToUpload.push({
@@ -364,7 +364,7 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
               try {
                 const cleanUrl = bg.split('#')[0];
                 const isVideo = bg.endsWith('#video');
-                const bgRes = await fetch(cleanUrl);
+                const bgRes = await fetch(cleanUrl, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } });
                 if (!bgRes.ok) throw new Error("Bad bg fetch");
                 const bgBlob = await bgRes.blob();
                 filesToUpload.push({

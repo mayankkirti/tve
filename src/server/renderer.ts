@@ -262,18 +262,31 @@ export async function startRenderJob(id, config) {
       } else {
         segments.push({ start: 0, end: totalSeconds || 999999, bgIndex: 0 });
       }
+      const usageCount = new Array(numBgInputs).fill(0);
+      for (const seg of segments) usageCount[seg.bgIndex]++;
       for (let i = 0; i < numBgInputs; i++) {
-        filterComplex += `[${i + 1}]${bgScale},format=yuv420p[scaled_bg${i}];`;
+        filterComplex += `[${i + 1}]${bgScale},format=yuv420p[scaled_bg_base${i}];`;
+        if (usageCount[i] > 1) {
+           let splits = "";
+           for(let j=0; j<usageCount[i]; j++) splits += `[scaled_bg${i}_${j}]`;
+           filterComplex += `[scaled_bg_base${i}]split=${usageCount[i]}${splits};`;
+        } else if (usageCount[i] === 1) {
+           filterComplex += `[scaled_bg_base${i}]copy[scaled_bg${i}_0];`;
+        } else {
+           filterComplex += `[scaled_bg_base${i}]nullsink;`;
+        }
       }
       let sid = 0;
+      const consumed = new Array(numBgInputs).fill(0);
       for (const seg of segments) {
+        const streamName = `[scaled_bg${seg.bgIndex}_${consumed[seg.bgIndex]++}]`;
         const nextOut = `[base${sid}]`;
         const isFade = config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4;
         if (isFade) {
-          filterComplex += `[scaled_bg${seg.bgIndex}]format=yuva420p,fade=t=in:st=${seg.start}:d=1:alpha=1,fade=t=out:st=${seg.end - 1}:d=1:alpha=1[faded${sid}];`;
+          filterComplex += `${streamName}format=yuva420p,fade=t=in:st=${seg.start}:d=1:alpha=1,fade=t=out:st=${seg.end - 1}:d=1:alpha=1[faded${sid}];`;
           filterComplex += `${prevBgOut}[faded${sid}]overlay=enable='between(t,${seg.start},${seg.end})'${nextOut};`;
         } else {
-          filterComplex += `${prevBgOut}[scaled_bg${seg.bgIndex}]overlay=enable='between(t,${seg.start},${seg.end})'${nextOut};`;
+          filterComplex += `${prevBgOut}${streamName}overlay=enable='between(t,${seg.start},${seg.end})'${nextOut};`;
         }
         prevBgOut = nextOut;
         sid++;
