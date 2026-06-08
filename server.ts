@@ -1,8 +1,8 @@
 import express from "express";
-import path from "path";
+import * as path from "path";
 import { createServer as createViteServer } from "vite";
 import multer from "multer";
-import fs from "fs";
+import * as fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { startRenderJob, jobs, killRenderJob, pauseRenderJob, resumeRenderJob } from "./src/server/renderer";
 import { saveJobs } from "./src/server/jobStore";
@@ -224,8 +224,7 @@ if (!fs.existsSync(chunksDir)) {
 }
 
 app.post("/api/upload-chunk", upload.single("chunk"), (req, res) => {
-  require('fs').appendFileSync('upload_log.txt', JSON.stringify({ body: req.body, file: req.file, headers: req.headers }) + '\n');
-
+  
   console.log("Got upload chunk for:", req.body.uploadId, req.body.chunkIndex);
   if (!req.file) {
     console.error("Missing chunk file! body:", req.body);
@@ -324,7 +323,7 @@ app.post("/api/render", (req, res) => {
       if (typeof p !== 'string') return p;
       let cleanP = p.split('#')[0]; // Remove #video etc
       if (cleanP.includes('/api/uploads/')) {
-         return require('path').join(process.cwd(), "uploads", cleanP.split('/uploads/').pop());
+         return path.join(process.cwd(), "uploads", cleanP.split('/uploads/').pop());
       }
       return cleanP;
   };

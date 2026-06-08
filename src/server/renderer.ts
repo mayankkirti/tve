@@ -1,7 +1,7 @@
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
-import path from "path";
-import fs from "fs";
+import * as path from "path";
+import * as fs from "fs";
 import { execSync } from "child_process";
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 import { loadJobs } from "./jobStore";
