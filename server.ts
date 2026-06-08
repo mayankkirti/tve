@@ -2,12 +2,12 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import multer from "multer";
-import fs from "fs";
+import fsMod from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { startRenderJob, jobs, killRenderJob, pauseRenderJob, resumeRenderJob } from "./src/server/renderer";
 import { saveJobs } from "./src/server/jobStore";
 import { systemConfig, saveConfig } from "./src/server/config";
-import { authenticator } from "otplib";
+import { generateSecret, generateURI, verifySync } from "otplib";
 import qrcode from "qrcode";
 
 const app = express();
@@ -19,7 +19,6 @@ const PORT = 3000;
 const activeTokens = new Set<string>();
 
 const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  return next();
   if (req.path === '/api/login' || req.path === '/api/verify-mfa' || !req.path.startsWith('/api')) {
     return next();
   }
@@ -46,9 +45,9 @@ app.post("/api/login", async (req, res) => {
   const expectedPass = systemConfig.password;
   if (username === expectedUser && password === expectedPass) {
     if (!systemConfig.totpSecret) {
-       systemConfig.totpSecret = authenticator.generateSecret();
+       systemConfig.totpSecret = generateSecret();
        saveConfig();
-       const otpauth = authenticator.keyuri(expectedUser, 'TVE Auth', systemConfig.totpSecret);
+       const otpauth = generateURI({ issuer: 'TVE Auth', label: expectedUser, secret: systemConfig.totpSecret });
        const qrCodeUrl = await qrcode.toDataURL(otpauth);
        return res.json({ mfaSetupRequired: true, qrCodeUrl, mfaRequired: true, secret: systemConfig.totpSecret });
     }
@@ -61,7 +60,7 @@ app.post("/api/login", async (req, res) => {
 app.post("/api/verify-mfa", (req, res) => {
   const { code } = req.body;
   if (!systemConfig.totpSecret) { return res.status(400).json({ error: "MFA not set up." }); }
-  const isValid = authenticator.verify({ token: code, secret: systemConfig.totpSecret });
+  const isValid = verifySync({ token: code, secret: systemConfig.totpSecret }).valid;
   if (isValid) {
      const token = uuidv4();
      activeTokens.add(token);
