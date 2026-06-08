@@ -7,7 +7,8 @@ import { v4 as uuidv4 } from "uuid";
 import { startRenderJob, jobs, killRenderJob, pauseRenderJob, resumeRenderJob } from "./src/server/renderer";
 import { saveJobs } from "./src/server/jobStore";
 import { systemConfig, saveConfig } from "./src/server/config";
-import nodemailer from "nodemailer";
+import { authenticator } from "otplib";
+import qrcode from "qrcode";
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
