@@ -7,7 +7,8 @@ export let systemConfig = {
   diskLimitMB: 2048,
   password: "admin", // default password
   mfaCode: "",
-  mfaExpiry: 0
+  mfaExpiry: 0,
+  totpSecret: ""
 };
 
 export function loadConfig() {

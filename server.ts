@@ -38,43 +38,19 @@ const authMiddleware = (req: express.Request, res: express.Response, next: expre
 
 app.use(authMiddleware);
 
+
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
   const expectedUser = process.env.APP_USERNAME || "admin";
   const expectedPass = systemConfig.password;
-  
   if (username === expectedUser && password === expectedPass) {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    systemConfig.mfaCode = code;
-    systemConfig.mfaExpiry = Date.now() + 5 * 60 * 1000; // 5 mins
-    saveConfig();
-
-    try {
-      // Setup Nodemailer transporter - we use ethereal for demo or user should configure real SMTP
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        auth: {
-            user: process.env.SMTP_USER || 'ethereal.user@ethereal.email',
-            pass: process.env.SMTP_PASS || 'ethereal-pass'
-        }
-      });
-      // In a real environment, they would use correct SMTP credentials.
-      if (process.env.SMTP_HOST) {
-        await transporter.sendMail({
-          from: '"TVE Auth" <no-reply@tve.azurewebsites.net>',
-          to: 'neurographs@gmail.com',
-          subject: 'TVE Authentication Code',
-          text: `Your login code is: ${code}`
-        });
-      } else {
-        console.log(`[MFA] Sent code ${code} to neurographs@gmail.com`); // Fallback if no SMTP configured
-      }
-    } catch(e) {
-      console.error("MFA Email failed to send, but continuing for dev mode:", e);
-      console.log(`[MFA] Fallback code: ${code}`); 
+    if (!systemConfig.totpSecret) {
+       systemConfig.totpSecret = authenticator.generateSecret();
+       saveConfig();
+       const otpauth = authenticator.keyuri(expectedUser, 'TVE Auth', systemConfig.totpSecret);
+       const qrCodeUrl = await qrcode.toDataURL(otpauth);
+       return res.json({ mfaSetupRequired: true, qrCodeUrl, mfaRequired: true, secret: systemConfig.totpSecret });
     }
-
     res.json({ mfaRequired: true });
   } else {
     res.status(401).json({ error: "Invalid credentials" });
@@ -83,12 +59,9 @@ app.post("/api/login", async (req, res) => {
 
 app.post("/api/verify-mfa", (req, res) => {
   const { code } = req.body;
-  if (!systemConfig.mfaCode || Date.now() > systemConfig.mfaExpiry) {
-     return res.status(400).json({ error: "Code expired. Please login again." });
-  }
-  if (systemConfig.mfaCode === code) {
-     systemConfig.mfaCode = "";
-     saveConfig();
+  if (!systemConfig.totpSecret) { return res.status(400).json({ error: "MFA not set up." }); }
+  const isValid = authenticator.verify({ token: code, secret: systemConfig.totpSecret });
+  if (isValid) {
      const token = uuidv4();
      activeTokens.add(token);
      res.json({ token });
@@ -581,3 +554,4 @@ async function startServer() {
 }
 
 startServer();
+
