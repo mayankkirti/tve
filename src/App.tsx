@@ -19,7 +19,7 @@ export const createDefaultConfig = (): VideoConfig => ({
   audioCropEnabled: false,
   audioCropStart: 0,
   audioCropEnd: 0,
-  logoUrl: './logo.png', // Fallback to public/logo.png
+  logoUrl: '/logo.png', // Fallback to public/logo.png
   logoSize: 100,
   tracklistRaw: '',
   parsedTracklist: [],

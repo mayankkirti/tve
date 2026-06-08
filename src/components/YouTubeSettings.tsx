@@ -35,7 +35,7 @@ export function YouTubeSettings({
         setToken(res.accessToken);
       }
     } catch (e: any) {
-      setError(e.message || 'Login failed');
+      if(e.code === 'auth/unauthorized-domain') setError('Error: Domain unauthorized in Firebase. Please add this IP to Firebase Console > Authentication > Settings > Authorized domains.'); else setError(e.message || 'Login failed');
     }
   };
 
