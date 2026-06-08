@@ -65,7 +65,7 @@ app.post("/api/verify-mfa", (req, res) => {
   const isValid = verifySync({ token: code, secret: systemConfig.totpSecret }).valid;
   if (isValid) {
      const token = uuidv4();
-     activeTokens.add(); saveTokens();
+     activeTokens.add(token); saveTokens();
      res.json({ token });
   } else {
      res.status(401).json({ error: "Invalid code" });
@@ -75,7 +75,7 @@ app.post("/api/verify-mfa", (req, res) => {
 app.post("/api/logout", (req, res) => {
   const authHeader = req.headers.authorization;
   if (authHeader) {
-     activeTokens.delete(authHeader.split(' ')[1]);
+     activeTokens.delete(authHeader.split(' ')[1]); saveTokens();
   }
   res.json({ success: true });
 });
