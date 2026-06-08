@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import multer from "multer";
-import fsMod from "fs";
+import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { startRenderJob, jobs, killRenderJob, pauseRenderJob, resumeRenderJob } from "./src/server/renderer";
 import { saveJobs } from "./src/server/jobStore";
