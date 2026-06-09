@@ -281,10 +281,10 @@ export async function startRenderJob(id, config) {
       for (const seg of segments) {
         const streamName = `[scaled_bg${seg.bgIndex}_${consumed[seg.bgIndex]++}]`;
         const nextOut = `[base${sid}]`;
-        const isFade = config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4;
+        const isFade = config.bgMediaStyle === "tracklist" || config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4;
         if (isFade) {
-          filterComplex += `${streamName}format=yuva420p,fade=t=in:st=${seg.start}:d=1:alpha=1,fade=t=out:st=${seg.end - 1}:d=1:alpha=1[faded${sid}];`;
-          filterComplex += `${prevBgOut}[faded${sid}]overlay=enable='between(t,${seg.start},${seg.end})'${nextOut};`;
+          filterComplex += `${streamName}format=yuva420p,fade=t=in:st=${seg.start}:d=1:alpha=1[faded${sid}];`;
+          filterComplex += `${prevBgOut}[faded${sid}]overlay=enable='between(t,${seg.start},${seg.end + 1})'${nextOut};`;
         } else {
           filterComplex += `${prevBgOut}${streamName}overlay=enable='between(t,${seg.start},${seg.end})'${nextOut};`;
         }
@@ -338,7 +338,8 @@ export async function startRenderJob(id, config) {
     if (config.enableBlackOverlay !== false) {
       const opacity = config.overlayOpacity !== undefined ? config.overlayOpacity : 50;
       if (opacity > 0) {
-        filterComplex += `${finalBgOut}colorchannelmixer=rr=${1 - opacity / 100}:gg=${1 - opacity / 100}:bb=${1 - opacity / 100}[bgdark];`;
+        filterComplex += `color=c=black@${opacity / 100}:s=${config.width}x${config.height},format=yuva420p[black_overlay];`;
+        filterComplex += `${finalBgOut}[black_overlay]overlay=format=auto[bgdark];`;
         finalBgOut = "[bgdark]";
       }
     }
@@ -395,7 +396,8 @@ export async function startRenderJob(id, config) {
     const albumFS = Math.floor(h * 0.03 * baseTextSize);
     const channelFS = Math.floor(h * 0.045 * baseTextSize);
     if (config.channelName) {
-      addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.channelName) + "':fontcolor=white:fontsize=" + channelFS + ":x=50:y=50");
+      const yVal = 50 + Math.floor(120 * ((config.logoSize || 100) / 100)) / 2;
+      addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.channelName) + "':fontcolor=white:fontsize=" + channelFS + ":x=50:y=" + yVal + "-th/2");
     }
     let tracksGlobal = [];
     if (config.tracklistRaw) {

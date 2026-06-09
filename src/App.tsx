@@ -104,10 +104,9 @@ export default function App() {
          </button>
       </div>
       
-      {currentView === 'studio' && (
-         <>
+      <div className={currentView === 'studio' ? 'contents' : 'hidden'}>
           {/* Left Sidebar - Settings */}
-          <SettingsPanel 
+          <SettingsPanel isUploadingMedia={isUploadingMedia} setIsUploadingMedia={setIsUploadingMedia} uploadProgressText={uploadProgressText} setUploadProgressText={setUploadProgressText} 
             config={config} 
             setConfig={setConfig} 
             onReset={() => setConfig(createDefaultConfig())}
@@ -144,6 +143,8 @@ export default function App() {
                  ) : (
                     <div className="absolute inset-0 w-full h-full bg-zinc-950 opacity-80" />
                  )}
+
+                 <div className="absolute inset-0 w-full h-full bg-black pointer-events-none" style={{ opacity: config.enableBlackOverlay ? (config.overlayOpacity !== undefined ? config.overlayOpacity / 100 : 0.5) : 0 }} />
 
                  <div className="z-10 text-center space-y-4">
                      <h3 className="text-2xl font-bold text-zinc-300">Ready to Render</h3>
@@ -210,8 +211,7 @@ export default function App() {
             resumeJob={resumeJob}
             removeJob={removeJob}
           />
-         </>
-      )}
+      </div>
 
       {currentView === 'storage' && <StorageManager />}
       {currentView === 'security' && <SecuritySettings />}

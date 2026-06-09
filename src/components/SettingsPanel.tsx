@@ -38,8 +38,8 @@ export function SettingsPanel({
   }, [config.audioUrl]);
 
   
-  const [isUploadingMedia, setIsUploadingMedia] = React.useState(false);
-  const [uploadProgressText, setUploadProgressText] = React.useState('');
+  
+  
 
   const uploadFilesToServer = async () => {
     setIsUploadingMedia(true);
