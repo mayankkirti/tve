@@ -715,10 +715,10 @@ export async function renderVideoTask(
          ctx.font = `bold ${Math.floor(canvas.height * 0.045 * textScale)}px ${fontFam}`;
          ctx.textAlign = 'left';
          ctx.textBaseline = 'middle';
-         ctx.fillText(config.channelName, padding, padding + logoSize / 2);
+         ctx.fillText(config.channelName, padding, padding/2 + logoSize / 2);
 
          if (logoImg) {
-            ctx.drawImage(logoImg, canvas.width - padding - logoSize, padding, logoSize, logoSize);
+            ctx.drawImage(logoImg, canvas.width - padding - logoSize, padding/2, logoSize, logoSize);
          }
 
                   if (config.style === 'minimal-fast') {

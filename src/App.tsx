@@ -156,14 +156,14 @@ export default function App() {
                  </div>
 
                  <div 
-                     className="absolute top-4 left-6 h-16 flex items-center text-white z-10 drop-shadow-md"
+                     className="absolute top-2 left-6 h-16 flex items-center text-white z-10 drop-shadow-md"
                      style={{ fontFamily: `"${config.textFont}", sans-serif`, fontSize: `${1.25 * (config.textSize / 100)}rem` }}
                  >
                      {config.channelName}
                  </div>
 
                  {config.logoUrl && (
-                   <img src={config.logoUrl?.includes('/uploads/') ? '/api/uploads/' + config.logoUrl.split('/uploads/').pop() : config.logoUrl} className="absolute top-4 right-6 w-16 h-16 object-contain z-10" alt="Logo" />
+                   <img src={config.logoUrl?.includes('/uploads/') ? '/api/uploads/' + config.logoUrl.split('/uploads/').pop() : config.logoUrl} className="absolute top-2 right-6 w-16 h-16 object-contain z-10" alt="Logo" />
                  )}
 
                  <div className="absolute bottom-6 left-6 text-left z-10 drop-shadow-md">

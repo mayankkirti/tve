@@ -199,11 +199,11 @@ export async function startRenderJob(id, config) {
         vizFilter = `showcqt=s=${config.width}x${config.height}:bar_h=${Math.floor(config.height * 0.2)}:axis_h=0:sono_g=4:sono_v=10`;
         break;
       case "indian-ambient":
-        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2`;
+        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=255:gc=210:bc=50:ac=255`;
         break;
       case "party-flash":
       case "chillout-flash":
-        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2`;
+        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=210:gc=160:bc=150:ac=255`;
         break;
       default:
         vizFilter = `showwaves=s=${config.width}x${config.height}:mode=cline:colors=white`;
@@ -355,7 +355,7 @@ export async function startRenderJob(id, config) {
       const targetW = Math.floor(120 * (sizeVal / 100));
       const w = targetW + targetW % 2;
       filterComplex += `[${logoInputIndex}:v]scale=${w}:-1[logo];`;
-      filterComplex += `[bgviz][logo]overlay=W-w-50:50[final1];`;
+      filterComplex += `[bgviz][logo]overlay=W-w-50:25[final1];`;
     } else {
       filterComplex += `[bgviz]copy[final1];`;
     }
@@ -384,6 +384,8 @@ export async function startRenderJob(id, config) {
       }
     }
     const fontPath = path.join(process.cwd(), "public", fontFile).replace(/\\/g, "/");
+    const fontPathItalic = fs.existsSync(path.join(process.cwd(), "public", "font_italic.ttf")) ? path.join(process.cwd(), "public", "font_italic.ttf").replace(/\\/g, "/") : fontPath;
+    const fontPathBold = fs.existsSync(path.join(process.cwd(), "public", "font_bold.ttf")) ? path.join(process.cwd(), "public", "font_bold.ttf").replace(/\\/g, "/") : fontPath;
     let prevOut = "[final1]";
     let filterIndex = 1;
     const tracklistFileCleanup = path.join(process.cwd(), `tracklist_${id}.txt`);
@@ -396,7 +398,7 @@ export async function startRenderJob(id, config) {
     const albumFS = Math.floor(h * 0.03 * baseTextSize);
     const channelFS = Math.floor(h * 0.045 * baseTextSize);
     if (config.channelName) {
-      const yVal = 50 + Math.floor(120 * ((config.logoSize || 100) / 100)) / 2;
+      const yVal = 25 + Math.floor(120 * ((config.logoSize || 100) / 100)) / 2;
       addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.channelName) + "':fontcolor=white:fontsize=" + channelFS + ":x=50:y=" + yVal + "-th/2");
     }
     let tracksGlobal = [];
@@ -430,14 +432,14 @@ export async function startRenderJob(id, config) {
         const trk = tracksGlobal[i];
         const endT = tracksGlobal[i+1] ? tracksGlobal[i+1].timeSec : 999999;
         const enable = "enable='between(t," + trk.timeSec + "," + endT + ")':";
-        if(trk.songName) addTextOptions.push("drawtext=" + enable + "fontfile='" + fontPath + "':text='" + escapeText(trk.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
+        if(trk.songName) addTextOptions.push("drawtext=" + enable + "fontfile='" + fontPathBold + "':text='" + escapeText(trk.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
         if(trk.artistName) addTextOptions.push("drawtext=" + enable + "fontfile='" + fontPath + "':text='" + escapeText(trk.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
       }
-      if(config.albumName) addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.albumName) + "':fontcolor=white:fontsize=" + albumFS + ":x=50:y=" + albumYWithTracks);
+      if(config.albumName) addTextOptions.push("drawtext=fontfile='" + fontPathItalic + "':text='" + escapeText(config.albumName) + "':fontcolor=white:fontsize=" + albumFS + ":x=50:y=" + albumYWithTracks);
     } else {
-      if (config.songName) addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
+      if (config.songName) addTextOptions.push("drawtext=fontfile='" + fontPathBold + "':text='" + escapeText(config.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
       if (config.artistName) addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
-      if (config.albumName) addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.albumName) + "':fontcolor=white:fontsize=" + albumFS + ":x=50:y=" + albumYNoTracks);
+      if (config.albumName) addTextOptions.push("drawtext=fontfile='" + fontPathItalic + "':text='" + escapeText(config.albumName) + "':fontcolor=white:fontsize=" + albumFS + ":x=50:y=" + albumYNoTracks);
     }
     addTextOptions.forEach((drawtextStr) => {
       const nextOut = `[t${filterIndex}]`;
