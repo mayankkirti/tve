@@ -21,7 +21,7 @@ try { if (fs.existsSync('active_tokens.json')) activeTokens = new Set(JSON.parse
 const saveTokens = () => fs.writeFileSync('active_tokens.json', JSON.stringify([...activeTokens]));
 
 const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (req.path === '/api/login' || req.path === '/api/verify-mfa' || !req.path.startsWith('/api')) {
+  if (req.path === '/api/login' || req.path === '/api/verify-mfa' || !req.path.startsWith('/api') || req.path.startsWith('/api/uploads') || req.path.match(/^\/api\/jobs\/[^/]+\/download$/)) {
     return next();
   }
   
@@ -410,7 +410,7 @@ app.get("/api/jobs/:id/logs", (req, res) => {
 
 app.get("/api/jobs/:id/download", (req, res) => {
   const job = jobs[req.params.id];
-  if (!job || job.status !== "completed" || !job.outputPath) {
+  if (!job || job.status !== "completed" || !job.outputPath) { console.error("DOWNLOAD REJECTED! job exists:", !!job, "status:", job?.status, "outputPath:", job?.outputPath); 
     return res
       .status(404)
       .send(
@@ -482,7 +482,7 @@ app.post("/api/disk/youtube", async (req, res) => {
     const result = await youtube.videos.insert({
       part: ["snippet", "status"],
       requestBody: metadata,
-      media: { body: fs.createReadStream(fp) }
+      media: { mimeType: 'video/mp4', body: fs.createReadStream(fp) }
     });
     res.json({ url: `https://youtube.com/watch?v=${result.data.id}` });
   } catch(e:any) {

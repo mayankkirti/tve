@@ -199,7 +199,6 @@ export function SettingsPanel({
         
         {/* Basic Info */}
         <div className="space-y-3">
-          
           <label className="block text-xs font-semibold uppercase text-zinc-500">Project Name</label>
           <input 
             type="text" 
@@ -208,39 +207,6 @@ export function SettingsPanel({
             className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:border-zinc-500"
           />
         </div>
-        
-        {/* Output Settings */}
-        <div className="space-y-3">
-          <label className="block text-xs font-semibold uppercase text-zinc-500">Output format</label>
-          <div>
-            <label className="block mb-1">Resolution</label>
-            <select 
-              value={config.resolution.label}
-              onChange={(e) => {
-                const res = RESOLUTIONS.find(r => r.label === e.target.value);
-                if (res) setConfig(prev => ({ ...prev, resolution: res }));
-              }}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 focus:outline-none"
-            >
-              {RESOLUTIONS.map(r => (
-                <option key={r.label} value={r.label}>{r.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block mb-1">Framerate (FPS)</label>
-            <select 
-              value={config.fps}
-              onChange={(e) => setConfig(prev => ({ ...prev, fps: parseInt(e.target.value) }))}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 focus:outline-none"
-            >
-              <option value={30}>30 fps</option>
-              <option value={60}>60 fps</option>
-            </select>
-          </div>
-        </div>
-
-
 
         {/* Media */}
         <div className="space-y-3">
@@ -595,3 +561,4 @@ export function SettingsPanel({
     </div>
   );
 }
+
