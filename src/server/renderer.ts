@@ -295,22 +295,35 @@ export async function startRenderJob(id, config) {
     } else {
       filterComplex += `[1]${bgScale},format=yuv420p[bg];`;
     }
-    filterComplex += `[0:a]${vizFilter}[viz];`;
     let finalBgOut = "[bg]";
     const overlayNoiseLevel = config.overlayEffect && (config.overlayEffect.includes("Grain") || config.overlayEffect.includes("Scratches") || config.overlayEffect.includes("Glitch")) ? 50 : 15;
     let needsAudioMask = !config.bypassOverlays && (config.overlayEffect && config.overlayEffect !== "None" || config.brightnessEnabled);
+    
+    let useOlay = !config.bypassOverlays && (config.overlayEffect && config.overlayEffect !== "None");
+    let useBright = !config.bypassOverlays && config.brightnessEnabled;
+
     if (needsAudioMask) {
-      filterComplex += `[0:a]showwaves=s=256x256:mode=p2p:colors=white,boxblur=40:5,scale=${config.width}x${config.height}[a_mask];`;
+      filterComplex += `[0:a]asplit=2[a_viz][a_mask_in];`;
+      filterComplex += `[a_viz]${vizFilter}[viz];`;
+      filterComplex += `[a_mask_in]showwaves=s=256x256:mode=p2p:colors=white,boxblur=40:5,scale=${config.width}x${config.height}[a_mask_base];`;
+      if (useOlay && useBright) {
+         filterComplex += `[a_mask_base]split=2[a_mask1][a_mask2];`;
+      } else {
+         filterComplex += `[a_mask_base]copy[a_mask1];`;
+      }
+    } else {
+      filterComplex += `[0:a]${vizFilter}[viz];`;
     }
-    if (!config.bypassOverlays && config.overlayEffect && config.overlayEffect !== "None") {
+    if (useOlay) {
       filterComplex += `color=c=black:s=${config.width}x${config.height}:r=${config.fps},noise=alls=${overlayNoiseLevel}:allf=t+u[olay_base];`;
-      filterComplex += `[olay_base][a_mask]blend=all_mode=multiply[olay_reactive];`;
+      filterComplex += `[olay_base][a_mask1]blend=all_mode=multiply[olay_reactive];`;
       filterComplex += `${finalBgOut}[olay_reactive]blend=all_mode=screen:all_opacity=0.35[bgw_noise];`;
       finalBgOut = "[bgw_noise]";
     }
-    if (!config.bypassOverlays && config.brightnessEnabled) {
+    if (useBright) {
       const brIntensity = (config.brightnessLevel || 50) / 100;
-      filterComplex += `${finalBgOut}[a_mask]blend=all_mode=screen:all_opacity=${brIntensity * 0.7}[bgw_bright];`;
+      const maskToUse = (useOlay && useBright) ? 'a_mask2' : 'a_mask1';
+      filterComplex += `${finalBgOut}[${maskToUse}]blend=all_mode=screen:all_opacity=${brIntensity * 0.7}[bgw_bright];`;
       finalBgOut = "[bgw_bright]";
     }
     if (config.overlayOpacity !== void 0) {

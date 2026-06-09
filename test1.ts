@@ -1,1 +1,2 @@
-import { generateVideoCommand } from './src/server/renderer';
+
+import { startRenderJob } from './src/server/renderer';
