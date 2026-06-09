@@ -310,7 +310,7 @@ export async function startRenderJob(id, config) {
     if (needsAudioMask) {
       filterComplex += `[0:a]asplit=2[a_viz][a_mask_in];`;
       filterComplex += `[a_viz]${vizFilter}[viz];`;
-      filterComplex += `[a_mask_in]showwaves=s=10x10:mode=cline:colors=white,boxblur=5:5,scale=${config.width}x${config.height}:flags=bicubic[a_mask_base];`;
+      filterComplex += `[a_mask_in]aformat=channel_layouts=mono,compand,showwaves=s=2x2:mode=cline:colors=white,boxblur=2:2,scale=${config.width}x${config.height}:flags=bicubic[a_mask_base];`;
       if (useOlay && useBright) {
          filterComplex += `[a_mask_base]split=2[a_mask1][a_mask2];`;
       } else {
@@ -330,7 +330,7 @@ export async function startRenderJob(id, config) {
     if (useBright) {
       const brIntensity = (config.brightnessLevel || 50) / 100;
       const maskToUse = (useOlay && useBright) ? 'a_mask2' : 'a_mask1';
-      filterComplex += `${finalBgOut}[${maskToUse}]blend=all_mode=screen:all_opacity=${brIntensity * 1.5}[bgw_bright];`;
+      filterComplex += `${finalBgOut}[${maskToUse}]blend=all_mode=screen:all_opacity=${brIntensity * 3}[bgw_bright];`;
       finalBgOut = "[bgw_bright]";
     }
     

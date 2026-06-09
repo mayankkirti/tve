@@ -120,7 +120,11 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
                            progress: data.progress || 0,
                            error: data.error,
                            etaMilliseconds: data.etaMilliseconds,
-                           status: data.status, ...(data.status === 'completed' ? { blobUrl: `/api/jobs/${job.backendId}/download`, progress: 100 } : {})
+                           status: data.status, ...(data.status === 'completed' || data.status === 'failed' ? { 
+                              blobUrl: data.status === 'completed' ? `/api/jobs/${job.backendId}/download` : undefined, 
+                              progress: data.status === 'completed' ? 100 : job.progress,
+                              endTime: job.endTime || Date.now()
+                           } : {})
                         });
                      }
                   }

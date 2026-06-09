@@ -460,7 +460,7 @@ export function SettingsPanel({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block">BG Zoom (Audio Reactive) ({config.bgZoomLevel}%)</label>
+              <label className="block">BG Slow Cinematic Zoom ({config.bgZoomLevel}%)</label>
               <button
                 type="button"
                 onClick={() => setConfig(prev => ({ ...prev, bgZoomEnabled: !prev.bgZoomEnabled }))}
