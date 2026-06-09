@@ -486,8 +486,9 @@ app.post("/api/disk/youtube", async (req, res) => {
     });
     res.json({ url: `https://youtube.com/watch?v=${result.data.id}` });
   } catch(e:any) {
+    const statusCode = e.response?.status || 500;
     const errorMessage = e.response?.data?.error?.message || e.message;
-    res.status(500).json({ error: errorMessage });
+    res.status(statusCode).json({ error: errorMessage });
   }
 });
 
@@ -520,6 +521,7 @@ app.post("/api/jobs/:id/youtube", async (req, res) => {
       notifySubscribers: false,
       requestBody: metadata,
       media: {
+        mimeType: 'video/mp4',
         body: fs.createReadStream(job.outputPath),
       },
     });
@@ -529,8 +531,9 @@ app.post("/api/jobs/:id/youtube", async (req, res) => {
     res.json({ url: `https://youtube.com/watch?v=${videoId}` });
   } catch (e: any) {
     console.error("Youtube upload error", e);
+    const statusCode = e.response?.status || 500;
     const errorMessage = e.response?.data?.error?.message || e.message;
-    res.status(500).json({ error: errorMessage });
+    res.status(statusCode).json({ error: errorMessage });
   }
 });
 

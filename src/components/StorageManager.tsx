@@ -69,17 +69,53 @@ export function StorageManager() {
            }
            if (!token) {
                const res = await googleSignIn();
-               if (res) token = res.accessToken;
-               else return;
+               if (res) {
+                   token = res.accessToken;
+                   localStorage.setItem('youtubeAccounts', JSON.stringify([{
+                       id: res.user.uid,
+                       name: res.user.displayName || 'Unknown',
+                       email: res.user.email || 'Unknown',
+                       token: res.accessToken,
+                   }]));
+               } else return;
            }
            
            setUploadingFile(filename);
-           const res = await fetch('/api/disk/youtube', {
+           let res = await fetch('/api/disk/youtube', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ filename, title: filename, description: 'Uploaded via Storage Manager', token })
            });
            
+           if (res.status === 401 || res.status === 403) {
+               try {
+                   const signRes = await googleSignIn();
+                   if (signRes) {
+                       token = signRes.accessToken;
+                       localStorage.setItem('youtubeAccounts', JSON.stringify([{
+                           id: signRes.user.uid,
+                           name: signRes.user.displayName || 'Unknown',
+                           email: signRes.user.email || 'Unknown',
+                           token: signRes.accessToken,
+                       }]));
+                       res = await fetch('/api/disk/youtube', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ filename, title: filename, description: 'Uploaded via Storage Manager', token })
+                       });
+                   } else {
+                       return;
+                   }
+               } catch (e: any) {
+                   if (e?.message?.includes("popup")) {
+                       alert("Popup blocked. Please open the app in a new tab to sign in to YouTube.");
+                   } else {
+                       alert("Authentication failed: " + e.message);
+                   }
+                   return;
+               }
+           }
+
            const data = await res.json();
            if (res.ok && data.url) {
                alert(`Successfully uploaded to YouTube: ${data.url}`);
