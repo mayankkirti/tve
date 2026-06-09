@@ -312,7 +312,7 @@ export async function startRenderJob(id, config) {
     if (needsAudioMask) {
       filterComplex += `[0:a]asplit=2[a_viz][a_mask_in];`;
       filterComplex += `[a_viz]${vizFilter}[viz];`;
-      filterComplex += `[a_mask_in]aformat=channel_layouts=mono,compand,showwaves=s=2x2:mode=cline:colors=white,boxblur=2:2,scale=${config.width}x${config.height}:flags=bicubic[a_mask_base];`;
+      filterComplex += `[a_mask_in]aformat=channel_layouts=mono,compand,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,scale=${config.width}x${config.height}:flags=bicubic[a_mask_base];`;
       if (useOlay && useBright) {
          filterComplex += `[a_mask_base]split=2[a_mask1][a_mask2];`;
       } else {

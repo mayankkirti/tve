@@ -6,7 +6,6 @@ import { Settings, Image as ImageIcon, Music, Play, Plus, X, RotateCcw } from 'l
 import { cn } from '../lib/utils';
 import { parseTracklist } from '../engine/RenderEngine';
 import { AudioCropper } from './AudioCropper';
-import { YouTubeSettings } from './YouTubeSettings';
 
 export function SettingsPanel({
   config,
@@ -569,8 +568,6 @@ export function SettingsPanel({
             <div className="text-xs text-zinc-500 mt-1">Parsed: {config.parsedTracklist.length} tracks found</div>
           </div>
         </div>
-        
-        <YouTubeSettings token={youtubeToken} setToken={setYoutubeToken} autoUploadYT={autoUploadYT} setAutoUploadYT={setAutoUploadYT} />
 
       </div>
 

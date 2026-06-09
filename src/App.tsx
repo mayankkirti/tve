@@ -9,7 +9,8 @@ import { generateSeoFileName } from './lib/utils';
 import { LoginScreen } from './components/LoginScreen';
 import { StorageManager } from './components/StorageManager';
 import { SecuritySettings } from './components/SecuritySettings';
-import { LogOut, MonitorPlay, HardDrive, Shield } from 'lucide-react';
+import { YouTubeAccountsTab } from './components/YouTubeAccountsTab';
+import { LogOut, MonitorPlay, HardDrive, Shield, Youtube } from 'lucide-react';
 
 export const createDefaultConfig = (): VideoConfig => ({
   id: uuidv4(),
@@ -46,9 +47,27 @@ export default function App() {
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [uploadProgressText, setUploadProgressText] = useState("");
   const [youtubeToken, setYoutubeToken] = useState<string | null>(null);
-  const [autoUploadYT, setAutoUploadYT] = useState<boolean>(true);
+  
+  useEffect(() => {
+    try {
+       const stored = localStorage.getItem('youtubeAccounts');
+       if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.length > 0) {
+             setYoutubeToken(parsed[0].token);
+          }
+       }
+    } catch(e) {}
+  }, []);
+  const [autoUploadYT, setAutoUploadYT] = useState<boolean>(() => {
+     return localStorage.getItem('autoUploadYT') !== 'false';
+  });
+
+  useEffect(() => {
+     localStorage.setItem('autoUploadYT', autoUploadYT.toString());
+  }, [autoUploadYT]);
   const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('auth_token'));
-  const [currentView, setCurrentView] = useState<'studio' | 'storage' | 'security'>('studio');
+  const [currentView, setCurrentView] = useState<'studio' | 'storage' | 'security' | 'youtube'>('studio');
 
   const { jobs, addJob, removeJob, killJob, pauseJob, resumeJob, startQueue } = useRenderQueue(youtubeToken, autoUploadYT);
 
@@ -94,6 +113,10 @@ export default function App() {
             <button title="Storage Manager" onClick={() => setCurrentView('storage')} className={`w-full flex justify-center py-3 relative ${currentView === 'storage' ? 'text-indigo-400' : 'text-zinc-600 hover:text-zinc-400'}`}>
                <HardDrive className="w-6 h-6" />
                {currentView === 'storage' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r" />}
+            </button>
+            <button title="YouTube Login" onClick={() => setCurrentView('youtube')} className={`w-full flex justify-center py-3 relative ${currentView === 'youtube' ? 'text-red-500' : 'text-zinc-600 hover:text-zinc-400'}`}>
+               <Youtube className="w-6 h-6" />
+               {currentView === 'youtube' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r" />}
             </button>
             <button title="Security" onClick={() => setCurrentView('security')} className={`w-full flex justify-center py-3 relative ${currentView === 'security' ? 'text-indigo-400' : 'text-zinc-600 hover:text-zinc-400'}`}>
                <Shield className="w-6 h-6" />
@@ -217,6 +240,7 @@ export default function App() {
 
       {currentView === 'storage' && <StorageManager />}
       {currentView === 'security' && <SecuritySettings />}
+      {currentView === 'youtube' && <YouTubeAccountsTab activeToken={youtubeToken} setActiveToken={setYoutubeToken} autoUploadYT={autoUploadYT} setAutoUploadYT={setAutoUploadYT} />}
 
     </div>
   );

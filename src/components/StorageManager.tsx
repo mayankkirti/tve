@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { HardDrive, Trash2, Edit2, Play, Download, Settings, RefreshCcw, Youtube } from 'lucide-react';
 import { formatTime } from '../lib/utils';
-import { getAccessToken, googleSignIn } from '../lib/auth';
+import { googleSignIn } from '../lib/auth';
 
 export function StorageManager() {
    const [files, setFiles] = useState<any[]>([]);
@@ -61,7 +61,12 @@ export function StorageManager() {
 
    const uploadToYouTube = async (filename: string) => {
        try {
-           let token = await getAccessToken();
+           let token = null;
+           const stored = localStorage.getItem('youtubeAccounts');
+           if (stored) {
+             const parsed = JSON.parse(stored);
+             if (parsed && parsed.length > 0) token = parsed[0].token;
+           }
            if (!token) {
                const res = await googleSignIn();
                if (res) token = res.accessToken;

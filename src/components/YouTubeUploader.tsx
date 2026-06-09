@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { UploadCloud, Play, User as UserIcon } from 'lucide-react';
-import { initAuth, googleSignIn, logout, getAccessToken } from '../lib/auth';
+import { googleSignIn } from '../lib/auth';
 import { uploadToYouTube } from '../lib/youtube';
 import type { User } from 'firebase/auth';
 import { RenderJob } from '../types';
+import { YTAccount } from './YouTubeAccountsTab';
 
 export function YouTubeUploader({ job }: { job: RenderJob }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [accounts, setAccounts] = useState<YTAccount[]>([]);
   const [token, setToken] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -14,17 +15,16 @@ export function YouTubeUploader({ job }: { job: RenderJob }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = initAuth(
-      (user, token) => {
-        setUser(user);
-        setToken(token);
-      },
-      () => {
-        setUser(null);
-        setToken(null);
-      }
-    );
-    return () => unsubscribe();
+     try {
+       const stored = localStorage.getItem('youtubeAccounts');
+       if (stored) {
+          const parsed = JSON.parse(stored);
+          setAccounts(parsed);
+          if (parsed && parsed.length > 0) {
+             setToken(parsed[0].token);
+          }
+       }
+     } catch(e) {}
   }, []);
 
   const handleLogin = async () => {
@@ -32,11 +32,14 @@ export function YouTubeUploader({ job }: { job: RenderJob }) {
       setError(null);
       const res = await googleSignIn();
       if (res) {
-        setUser(res.user);
         setToken(res.accessToken);
       }
     } catch (e: any) {
-      setError(e.message || 'Login failed');
+      if(e.code === 'auth/unauthorized-domain') {
+          setError('Domain unauthorized by Firebase.');
+      } else {
+          setError(e.message || 'Login failed');
+      }
     }
   };
 
@@ -123,7 +126,7 @@ export function YouTubeUploader({ job }: { job: RenderJob }) {
            <div className="bg-red-500 h-full transition-all duration-300" style={{ width: `${progress}%` }} />
            <div className="text-[10px] text-zinc-400 mt-1 text-center">Uploading... {progress}%</div>
         </div>
-      ) : user ? (
+      ) : token ? (
         <button 
           onClick={handleUpload}
           className="w-full h-full flex items-center justify-center gap-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 py-1.5 rounded text-xs font-medium transition-colors"

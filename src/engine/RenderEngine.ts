@@ -166,8 +166,10 @@ class Particle {
         currentAlpha = Math.max(0, this.alpha * (0.8 + 0.4 * reactivityData));
         const rad = this.size * (1 + reactivityData * 0.5);
         const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, rad);
-        grad.addColorStop(0, `rgba(220, 200, 180, ${currentAlpha})`);
-        grad.addColorStop(1, `rgba(220, 200, 180, 0)`);
+        grad.addColorStop(0, `rgba(255, 255, 255, ${currentAlpha})`); // White center
+        grad.addColorStop(0.3, `rgba(255, 255, 0, ${currentAlpha * 0.8})`); // Yellow
+        grad.addColorStop(0.6, `rgba(255, 215, 0, ${currentAlpha * 0.5})`); // Golden
+        grad.addColorStop(1, `rgba(255, 140, 0, 0)`); // Orange/Dark Orange at edge
         ctx.fillStyle = grad;
         ctx.arc(this.x, this.y, rad, 0, Math.PI * 2);
         ctx.fill();
