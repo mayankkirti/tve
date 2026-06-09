@@ -1,0 +1,1 @@
+import { generateVideoCommand } from './src/server/renderer';
