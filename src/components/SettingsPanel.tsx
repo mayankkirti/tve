@@ -16,7 +16,11 @@ export function SettingsPanel({
   youtubeToken,
   setYoutubeToken,
   autoUploadYT,
-  setAutoUploadYT
+  setAutoUploadYT,
+  isUploadingMedia,
+  setIsUploadingMedia,
+  uploadProgressText,
+  setUploadProgressText
 }: {
   config: VideoConfig;
   setConfig: React.Dispatch<React.SetStateAction<VideoConfig>>;
@@ -26,6 +30,10 @@ export function SettingsPanel({
   setYoutubeToken: (t: string | null) => void;
   autoUploadYT: boolean;
   setAutoUploadYT: (b: boolean) => void;
+  isUploadingMedia?: boolean;
+  setIsUploadingMedia?: any;
+  uploadProgressText?: string;
+  setUploadProgressText?: any;
 }) {
   const [audioDuration, setAudioDuration] = React.useState<number>(0);
   const audioRef = React.useRef<HTMLAudioElement>(null);

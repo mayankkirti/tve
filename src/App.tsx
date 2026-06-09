@@ -43,6 +43,8 @@ export const createDefaultConfig = (): VideoConfig => ({
 
 export default function App() {
   const [config, setConfig] = useState<VideoConfig>(createDefaultConfig());
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState("");
   const [youtubeToken, setYoutubeToken] = useState<string | null>(null);
   const [autoUploadYT, setAutoUploadYT] = useState<boolean>(true);
   const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('auth_token'));
