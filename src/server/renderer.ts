@@ -376,14 +376,54 @@ export async function startRenderJob(id, config) {
     const tracklistFileCleanup = path.join(process.cwd(), `tracklist_${id}.txt`);
     const addTextOptions = [];
     const baseTextSize = (config.textSize || 100) / 100;
-    const escapeText = (t) => t.replace(/'/g, "\\'").replace(/:/g, "\\:");
-    if (config.channelName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.channelName)}':fontcolor=white:fontsize=${Math.floor(40 * baseTextSize)}:x=50:y=100`);
-    if (config.albumName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.albumName)}':fontcolor=white:fontsize=${Math.floor(30 * baseTextSize)}:x=50:y=H-100`);
-    if (config.songName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='${escapeText(config.songName)}':fontcolor=white:fontsize=${Math.floor(50 * baseTextSize)}:x=50:y=H-200`);
-    if (config.artistName) addTextOptions.push(`drawtext=fontfile='${fontPath}':text='By ${escapeText(config.artistName)}':fontcolor=white:fontsize=${Math.floor(30 * baseTextSize)}:x=50:y=H-150`);
+    const escapeText = (t) => t.replace(/+/g, "\\'").replace(/:/g, "\\:");
+    const h = config.height || 1080;
+    const songFS = Math.floor(h * 0.06 * baseTextSize);
+    const artistFS = Math.floor(h * 0.035 * baseTextSize);
+    const albumFS = Math.floor(h * 0.03 * baseTextSize);
+    const channelFS = Math.floor(h * 0.045 * baseTextSize);
+    if (config.channelName) {
+      addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.channelName) + "':fontcolor=white:fontsize=" + channelFS + ":x=50:y=50");
+    }
+    let tracksGlobal = [];
     if (config.tracklistRaw) {
-      fs.writeFileSync(tracklistFileCleanup, config.tracklistRaw);
-      addTextOptions.push(`drawtext=fontfile='${fontPath}':textfile='${tracklistFileCleanup.replace(/\\/g, "/")}':fontcolor=white:fontsize=${Math.floor(24 * baseTextSize)}:x=50:y=H-th-50`);
+      const tlines = config.tracklistRaw.split("\n").map(l => l.trim()).filter(Boolean);
+      for (const line of tlines) {
+        const match = line.match(/^(\d{1,2}:\d{2}(?::\d{2})?)[ \t]*(?:\||-|—)?[ \t]+(.+)$/);
+        if (match) {
+          const rawTitle = match[2].trim();
+          let sName = rawTitle, aName = "";
+          if (rawTitle.includes(" - ")) {
+            const pts = rawTitle.split(" - ");
+            aName = pts[0].trim();
+            sName = pts.slice(1).join(" - ").trim();
+          }
+          const pts = match[1].split(":").map(Number);
+          let timeSec = 0;
+          if (pts.length === 2) timeSec = pts[0] * 60 + pts[1];
+          if (pts.length === 3) timeSec = pts[0] * 3600 + pts[1] * 60 + pts[2];
+          tracksGlobal.push({ timeSec, songName: sName, artistName: aName });
+        }
+      }
+      tracksGlobal.sort((a,b)=>a.timeSec - b.timeSec);
+    }
+    const songY = "H - 50 - th";
+    const artistY = "H - 50 - " + songFS + " - 10 - th";
+    const albumYWithTracks = "H - 50 - " + songFS + " - 10 - " + artistFS + " - 10 - th";
+    const albumYNoTracks = "H - 50 - " + songFS + " - 10 - th";
+    if (tracksGlobal.length > 0) {
+      for (let i=0; i<tracksGlobal.length; i++) {
+        const trk = tracksGlobal[i];
+        const endT = tracksGlobal[i+1] ? tracksGlobal[i+1].timeSec : 999999;
+        const enable = "enable='between(t," + trk.timeSec + "," + endT + ")':";
+        if(trk.songName) addTextOptions.push("drawtext=" + enable + "fontfile='" + fontPath + "':text='" + escapeText(trk.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
+        if(trk.artistName) addTextOptions.push("drawtext=" + enable + "fontfile='" + fontPath + "':text='" + escapeText(trk.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
+      }
+      if(config.albumName) addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.albumName) + "':fontcolor=white:fontsize=" + albumFS + ":x=50:y=" + albumYWithTracks);
+    } else {
+      if (config.songName) addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
+      if (config.artistName) addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
+      if (config.albumName) addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.albumName) + "':fontcolor=white:fontsize=" + albumFS + ":x=50:y=" + albumYNoTracks);
     }
     addTextOptions.forEach((drawtextStr) => {
       const nextOut = `[t${filterIndex}]`;
