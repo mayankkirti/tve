@@ -112,6 +112,10 @@ export function QueuePanel({
           if (job.startTime) {
             const endTime = job.endTime || now;
             timeTook = Math.max(0, endTime - job.startTime);
+            if (job.status === 'rendering' && job.progress > 0) {
+                const totalEst = (timeTook / job.progress) * 100;
+                timeLeft = Math.max(0, totalEst - timeTook);
+            }
           }
 
           return (
@@ -137,11 +141,16 @@ export function QueuePanel({
                     </>
                   )}
                   {job.status === 'rendering' && (
-                    <>
-                      <Loader className="w-3 h-3 text-indigo-400 animate-spin" />
-                      <span className="text-indigo-400 font-medium">Rendering... {job.progress}%</span>
-                      <div className="w-full flex justify-between text-zinc-500 font-mono text-[10px]"><span>Took: {formatTime(timeTook)}</span><span>ETA: {formatTime(timeLeft)}</span></div>
-                    </>
+                    <div className="flex flex-col gap-1 w-full">
+                      <div className="flex items-center gap-2">
+                        <Loader className="w-3 h-3 text-indigo-400 animate-spin" />
+                        <span className="text-indigo-400 font-medium">Rendering... {job.progress}%</span>
+                      </div>
+                      <div className="flex justify-between text-zinc-500 font-mono text-[10px] w-full px-5">
+                        <span>Took: {formatTime(timeTook)}</span>
+                        <span>ETA: {formatTime(timeLeft)}</span>
+                      </div>
+                    </div>
                   )}
                   {job.status === 'completed' && <span className="text-green-400">Completed (Took: {formatTime(timeTook)})</span>}
                   {job.status === 'failed' && <span className="text-red-400">Failed: {job.error}</span>}
