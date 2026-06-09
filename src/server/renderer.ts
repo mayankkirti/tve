@@ -190,6 +190,17 @@ export async function startRenderJob(id, config) {
     if (config.logoPath) {
       command = command.input(config.logoPath).inputOptions(["-loop", "1"]);
     }
+    
+    let gradInputIndex = -1;
+    if (config.style === "indian-ambient") {
+        const gradPath = path.join(process.cwd(), "public", `grad_indian_v2_${config.width}x${config.height}.png`);
+        if (!fs.existsSync(gradPath)) {
+             execSync(`"${ffmpegInstaller.path}" -v error -f lavfi -i nullsrc=s=${config.width}x${config.height} -vf "geq=r=255:g='max(140, 255-115*(hypot(X-W/2,Y-H/2)/(min(W,H)/2)))':b='max(0, 255-850*(hypot(X-W/2,Y-H/2)/(min(W,H)/2)))'" -vframes 1 -y "${gradPath}"`);
+        }
+        command = command.input(gradPath).inputOptions(["-loop", "1"]);
+        gradInputIndex = config.logoPath ? logoInputIndex + 1 : logoInputIndex;
+    }
+
     let vizFilter = "";
     switch (config.style) {
       case "minimal-fast":
@@ -199,7 +210,7 @@ export async function startRenderJob(id, config) {
         vizFilter = `showcqt=s=${config.width}x${config.height}:bar_h=${Math.floor(config.height * 0.2)}:axis_h=0:sono_g=4:sono_v=10`;
         break;
       case "indian-ambient":
-        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=255:gc=220:bc=0:ac=255:rf=5:gf=5:bf=5`;
+        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=255:gc=255:bc=255:ac=255:rf=5:gf=5:bf=5`;
         break;
       case "party-flash":
         vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=210:gc=160:bc=150:ac=255`;
@@ -325,15 +336,15 @@ export async function startRenderJob(id, config) {
     if (useOlay) {
       filterComplex += `color=c=black:s=${config.width}x${config.height}:r=${config.fps},noise=alls=${overlayNoiseLevel}:allf=t+u[olay_base];`;
       filterComplex += `[olay_base][a_mask1]blend=all_mode=multiply[olay_reactive];`;
-      filterComplex += `${finalBgOut}[olay_reactive]blend=all_mode=screen:all_opacity=0.35[bgw_noise];`;
+      filterComplex += `${finalBgOut}[olay_reactive]blend=c0_mode=screen:c0_opacity=0.35[bgw_noise];`;
       finalBgOut = "[bgw_noise]";
     }
     
     if (useBright) {
       const brIntensity = (config.brightnessLevel || 50) / 100;
       const maskToUse = (useOlay && useBright) ? 'a_mask2' : 'a_mask1';
-      const safeOpacity = Math.max(0, Math.min(1.0, brIntensity * 2));
-      filterComplex += `${finalBgOut}[${maskToUse}]blend=all_mode=screen:all_opacity=${safeOpacity}[bgw_bright];`;
+      const safeOpacity = Math.max(0, Math.min(0.5, brIntensity * 0.8)); // Capped at 50% and scaled down to prevent overexposure
+      filterComplex += `${finalBgOut}[${maskToUse}]blend=c0_mode=screen:c0_opacity=${safeOpacity}[bgw_bright];`;
       finalBgOut = "[bgw_bright]";
     }
     
@@ -348,6 +359,9 @@ export async function startRenderJob(id, config) {
     }
     if (config.style === "psychedelic") {
       filterComplex += `${finalBgOut}[viz]blend=all_mode=addition[bgviz];`;
+    } else if (config.style === "indian-ambient") {
+      filterComplex += `[viz][${gradInputIndex}:v]blend=all_mode=multiply[viz_color];`;
+      filterComplex += `${finalBgOut}[viz_color]blend=all_mode=screen[bgviz];`;
     } else if (config.style === "minimal-fast") {
       filterComplex += `${finalBgOut}[viz]overlay=(W-w)/2:H-h-50[bgviz];`;
     } else {
@@ -458,6 +472,43 @@ export async function startRenderJob(id, config) {
     const artistY = "H - 50 - " + songFS + " - 10 - th";
     const albumYWithTracks = "H - 50 - " + songFS + " - 10 - " + artistFS + " - 10 - th";
     const albumYNoTracks = "H - 50 - " + songFS + " - 10 - th";
+
+    let albumImageIndex = -1;
+    if (config.albumName) {
+       try {
+          const { createCanvas, registerFont } = require("canvas");
+          if (fs.existsSync(fontPath)) {
+            registerFont(fontPath, { family: 'CustomFont' });
+          }
+          const w = config.width;
+          const cvs = createCanvas(w, h);
+          const ctx = cvs.getContext('2d');
+          
+          ctx.font = `${albumFS}px "CustomFont", sans-serif`;
+          ctx.fillStyle = 'rgba(255,255,255,1)';
+          
+          const hasTracks = tracksGlobal.length > 0 || config.artistName;
+          let calcY = h - 50 - songFS - 10 - albumFS;
+          if (hasTracks) {
+              calcY = h - 50 - songFS - 10 - artistFS - 10 - albumFS;
+          }
+          ctx.save();
+          ctx.translate(50, calcY + albumFS);
+          ctx.transform(1, 0, Math.tan(-15 * Math.PI / 180), 1, 0, 0);
+          ctx.fillText(config.albumName, 0, -albumFS);
+          ctx.restore();
+
+          const skewPath = path.join(process.cwd(), "public", `album_${id}.png`);
+          fs.writeFileSync(skewPath, cvs.toBuffer());
+          
+          command = command.input(skewPath).inputOptions(["-loop", "1"]);
+          let baseIdx = numBgInputs + 1; // Logo or not, base is right after BG inputs
+          if (config.logoPath) baseIdx++;
+          if (gradInputIndex !== -1) baseIdx++;
+          albumImageIndex = baseIdx;
+       } catch(e) { console.error("Canvas failed", e); }
+    }
+
     if (tracksGlobal.length > 0) {
       for (let i=0; i<tracksGlobal.length; i++) {
         const trk = tracksGlobal[i];
@@ -466,18 +517,25 @@ export async function startRenderJob(id, config) {
         if(trk.songName) addTextOptions.push("drawtext=" + enable + "fontfile='" + fontPathBold + "':text='" + escapeText(trk.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
         if(trk.artistName) addTextOptions.push("drawtext=" + enable + "fontfile='" + fontPath + "':text='" + escapeText(trk.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
       }
-      if(config.albumName) addTextOptions.push("drawtext=fontfile='" + fontPathItalic + "':text='" + escapeText(config.albumName) + "':fontcolor=white:fontsize=" + albumFS + ":x=50:y=" + albumYWithTracks);
     } else {
       if (config.songName) addTextOptions.push("drawtext=fontfile='" + fontPathBold + "':text='" + escapeText(config.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
       if (config.artistName) addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
-      if (config.albumName) addTextOptions.push("drawtext=fontfile='" + fontPathItalic + "':text='" + escapeText(config.albumName) + "':fontcolor=white:fontsize=" + albumFS + ":x=50:y=" + albumYNoTracks);
     }
+
     addTextOptions.forEach((drawtextStr) => {
       const nextOut = `[t${filterIndex}]`;
       filterComplex += `${prevOut}${drawtextStr}${nextOut};`;
       prevOut = nextOut;
       filterIndex++;
     });
+
+    if (albumImageIndex !== -1) {
+      const nextOut = `[t${filterIndex}]`;
+      filterComplex += `${prevOut}[${albumImageIndex}:v]overlay=0:0${nextOut};`;
+      prevOut = nextOut;
+      filterIndex++;
+    }
+
     filterComplex += `${prevOut}format=yuv420p[outv]`;
     command = command.complexFilter(filterComplex).outputOptions([
       "-map",
