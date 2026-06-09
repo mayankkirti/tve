@@ -333,43 +333,60 @@ export function SettingsPanel({
 
         {/* Visuals */}
         <div className="space-y-3">
+          
           <label className="block text-xs font-semibold uppercase text-zinc-500">Visuals</label>
 
-          <div>
-             <div className="flex justify-between items-center mb-1">
-                <label className="block">Black Overlay Effect</label>
-                <button type="button" onClick={() => setConfig(prev => ({ ...prev, bypassOverlays: !prev.bypassOverlays }))} className={`text-xs px-2 py-1 rounded transition-colors ${!config.bypassOverlays ? 'bg-indigo-600 text-white' : 'bg-red-600 text-white'}`}>{config.bypassOverlays ? 'Bypassing' : 'Active'}</button>
-             </div>
-             <select
+          {/* Black Overlay */}
+          <div className="bg-zinc-800/50 p-2 rounded border border-zinc-700/50 space-y-2">
+            <div className="flex justify-between items-center">
+               <label className="block text-sm font-medium">Black Overlay</label>
+               <button 
+                 type="button" 
+                 onClick={() => setConfig(prev => ({ ...prev, enableBlackOverlay: !prev.enableBlackOverlay }))} 
+                 className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold transition-colors ${config.enableBlackOverlay ? 'bg-indigo-600 text-white' : 'bg-zinc-600 text-zinc-300'}`}
+               >
+                 {config.enableBlackOverlay ? 'Enabled' : 'Bypassed'}
+               </button>
+            </div>
+            <div className={`transition-opacity ${!config.enableBlackOverlay ? 'opacity-50 pointer-events-none' : ''}`}>
+              <label className="block text-xs mb-1 text-zinc-400">Opacity ({config.overlayOpacity}%)</label>
+              <input 
+                type="range" 
+                min="0" max="100" step="1"
+                value={config.overlayOpacity}
+                onChange={(e) => setConfig(prev => ({ ...prev, overlayOpacity: parseInt(e.target.value) }))}
+                className="w-full accent-indigo-500"
+              />
+            </div>
+          </div>
+
+          {/* Overlay Effect */}
+          <div className="bg-zinc-800/50 p-2 rounded border border-zinc-700/50 space-y-2">
+            <div className="flex justify-between items-center">
+               <label className="block text-sm font-medium">Overlay Effect</label>
+               <button 
+                 type="button" 
+                 onClick={() => setConfig(prev => ({ ...prev, bypassOverlayFX: !prev.bypassOverlayFX }))} 
+                 className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold transition-colors ${!config.bypassOverlayFX ? 'bg-indigo-600 text-white' : 'bg-red-600 text-white'}`}
+               >
+                 {!config.bypassOverlayFX ? 'Active' : 'Bypassed'}
+               </button>
+            </div>
+            <select
                value={config.overlayEffect || 'None'}
                onChange={(e) => setConfig(prev => ({ ...prev, overlayEffect: e.target.value }))}
-               disabled={config.bypassOverlays}
-               className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 focus:outline-none disabled:opacity-50"
+               disabled={config.bypassOverlayFX}
+               className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100 focus:outline-none disabled:opacity-50"
              >
                <option value="None">None</option>
-               <option value="Classic Orbs">Classic Orbs</option>
-               <option value="Soft Bokeh">Soft Bokeh</option>
-               <option value="Twinkling Dust">Twinkling Dust</option>
-               <option value="Drifting Motes">Drifting Motes</option>
-               <option value="Cinematic Light Leaks">Cinematic Light Leaks</option>
-               <option value="Falling Snow/Ash">Falling Snow/Ash</option>
-               <option value="Starfield Hyperdrive">Starfield Hyperdrive</option>
-               <option value="Rolling Fog">Rolling Fog</option>
-               <option value="Gentle Smoke">Gentle Smoke</option>
+               <option value="Noise">Video Noise</option>
                <option value="Film Grain">Film Grain</option>
-               <option value="Lens Flare">Lens Flare</option>
-               <option value="VHS Glitch">VHS Glitch</option>
-               <option value="Camera Viewfinder">Camera Viewfinder</option>
                <option value="Dust & Scratches">Dust & Scratches</option>
-               <option value="HUD">HUD</option>
-               <option value="Film Leader Countdown">Film Leader Countdown</option>
-               <option value="Grid Lines">Grid Lines</option>
-               <option value="Computer Code">Computer Code</option>
-               <option value="Rain">Rain</option>
+               <option value="VHS Glitch">VHS Glitch</option>
              </select>
           </div>
           
-          <div>
+<div>
             <label className="block mb-1">Style</label>
             <select 
               className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 focus:outline-none"
@@ -397,16 +414,7 @@ export function SettingsPanel({
             />
           </div>
 
-          <div>
-            <label className="block mb-1">Black Overlay Opacity ({config.overlayOpacity}%)</label>
-            <input 
-              type="range" 
-              min="0" max="100" step="1"
-              value={config.overlayOpacity}
-              onChange={(e) => setConfig(prev => ({ ...prev, overlayOpacity: parseInt(e.target.value) }))}
-              className="w-full"
-            />
-          </div>
+          
 
           <div>
             <div className="flex items-center justify-between mb-1">

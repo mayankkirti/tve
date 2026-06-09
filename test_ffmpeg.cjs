@@ -1,9 +1,13 @@
 
 const { startRenderJob } = require('./src/server/renderer');
 const config = {
-  bgPaths: ['dummy.mp4'],
-  width: 1920, height: 1080, fps: 30, textFont: 'Arial',
-  tracklistRaw: '00:00 Track 1 - Artist A\n00:05 Track 2 - Artist B',
-  bypassOverlays: true
+  bgPaths: ['dummy_video.mp4'],
+  audioPath: 'dummy_audio.mp3',
+  width: 1280, height: 720, fps: 30, textFont: 'Arial',
+  bypassOverlays: false,
+  overlayEffect: 'Grain',
+  overlayOpacity: 50,
+  brightnessEnabled: true,
+  brightnessLevel: 50
 };
-startRenderJob('test_id', config);
+startRenderJob('test_id2', config);

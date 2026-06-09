@@ -296,12 +296,17 @@ export async function startRenderJob(id, config) {
       filterComplex += `[1]${bgScale},format=yuv420p[bg];`;
     }
     let finalBgOut = "[bg]";
-    const overlayNoiseLevel = config.overlayEffect && (config.overlayEffect.includes("Grain") || config.overlayEffect.includes("Scratches") || config.overlayEffect.includes("Glitch")) ? 50 : 15;
-    let needsAudioMask = !config.bypassOverlays && (config.overlayEffect && config.overlayEffect !== "None" || config.brightnessEnabled);
-    
-    let useOlay = !config.bypassOverlays && (config.overlayEffect && config.overlayEffect !== "None");
-    let useBright = !config.bypassOverlays && config.brightnessEnabled;
 
+    let overlayNoiseLevel = 50;
+    if (config.overlayEffect === 'Film Grain') overlayNoiseLevel = 30;
+    if (config.overlayEffect === 'Dust & Scratches') overlayNoiseLevel = 80;
+    if (config.overlayEffect === 'VHS Glitch') overlayNoiseLevel = 100;
+
+    let useOlay = !config.bypassOverlayFX && config.overlayEffect && config.overlayEffect !== "None";
+    let useBright = config.brightnessEnabled;
+
+    let needsAudioMask = useOlay || useBright;
+    
     if (needsAudioMask) {
       filterComplex += `[0:a]asplit=2[a_viz][a_mask_in];`;
       filterComplex += `[a_viz]${vizFilter}[viz];`;
@@ -314,21 +319,28 @@ export async function startRenderJob(id, config) {
     } else {
       filterComplex += `[0:a]${vizFilter}[viz];`;
     }
+    
     if (useOlay) {
       filterComplex += `color=c=black:s=${config.width}x${config.height}:r=${config.fps},noise=alls=${overlayNoiseLevel}:allf=t+u[olay_base];`;
       filterComplex += `[olay_base][a_mask1]blend=all_mode=multiply[olay_reactive];`;
       filterComplex += `${finalBgOut}[olay_reactive]blend=all_mode=screen:all_opacity=0.35[bgw_noise];`;
       finalBgOut = "[bgw_noise]";
     }
+    
     if (useBright) {
       const brIntensity = (config.brightnessLevel || 50) / 100;
       const maskToUse = (useOlay && useBright) ? 'a_mask2' : 'a_mask1';
       filterComplex += `${finalBgOut}[${maskToUse}]blend=all_mode=screen:all_opacity=${brIntensity * 0.7}[bgw_bright];`;
       finalBgOut = "[bgw_bright]";
     }
-    if (config.overlayOpacity !== void 0) {
-      filterComplex += `${finalBgOut}colorchannelmixer=rr=${1 - config.overlayOpacity / 100}:gg=${1 - config.overlayOpacity / 100}:bb=${1 - config.overlayOpacity / 100}[bgdark];`;
-      finalBgOut = "[bgdark]";
+    
+    // Black Overlay
+    if (config.enableBlackOverlay !== false) {
+      const opacity = config.overlayOpacity !== undefined ? config.overlayOpacity : 50;
+      if (opacity > 0) {
+        filterComplex += `${finalBgOut}colorchannelmixer=rr=${1 - opacity / 100}:gg=${1 - opacity / 100}:bb=${1 - opacity / 100}[bgdark];`;
+        finalBgOut = "[bgdark]";
+      }
     }
     if (config.style === "psychedelic") {
       filterComplex += `${finalBgOut}[viz]blend=all_mode=addition[bgviz];`;
@@ -376,7 +388,7 @@ export async function startRenderJob(id, config) {
     const tracklistFileCleanup = path.join(process.cwd(), `tracklist_${id}.txt`);
     const addTextOptions = [];
     const baseTextSize = (config.textSize || 100) / 100;
-    const escapeText = (t) => t.replace(/+/g, "\\'").replace(/:/g, "\\:");
+    const escapeText = (t) => t.replace(/'/g, "\\'").replace(/:/g, "\\:");
     const h = config.height || 1080;
     const songFS = Math.floor(h * 0.06 * baseTextSize);
     const artistFS = Math.floor(h * 0.035 * baseTextSize);

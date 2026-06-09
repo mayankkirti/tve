@@ -33,7 +33,7 @@ export interface VideoConfig {
   textFont: string;
   resolution: Resolution;
   fps: number;
-  overlayOpacity: number;
+  enableBlackOverlay: boolean; overlayOpacity: number; bypassOverlayFX: boolean;
   bgZoomEnabled: boolean;
   bgZoomLevel: number;
   brightnessEnabled: boolean;
@@ -42,7 +42,6 @@ export interface VideoConfig {
   albumName: string;
   bgMediaStyle?: 'tracklist' | 'random-crossfade' | 'hard-cut' | 'soft-crossfade' | 'mix-cuts';
   overlayEffect?: string;
-  bypassOverlays?: boolean;
 }
 
 export interface RenderJob {
