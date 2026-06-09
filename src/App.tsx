@@ -168,7 +168,7 @@ export default function App() {
 
                  <div className="absolute bottom-6 left-6 text-left z-10 drop-shadow-md">
                      {config.albumName && (
-                         <div className="text-zinc-300 italic" style={{ fontFamily: `"${config.textFont}", sans-serif`, fontSize: `${0.875 * (config.textSize / 100)}rem` }}>
+                         <div className="text-zinc-300" style={{ fontFamily: `"${config.textFont}", sans-serif`, fontSize: `${0.875 * (config.textSize / 100)}rem`, transform: 'skewX(-15deg)', transformOrigin: 'bottom left' }}>
                              {config.albumName}
                          </div>
                      )}

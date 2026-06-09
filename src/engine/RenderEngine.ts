@@ -798,8 +798,12 @@ export async function renderVideoTask(
             }
 
             if (config.albumName) {
-              ctx.font = `italic ${Math.floor(canvas.height * 0.03 * textScale)}px ${fontFam}`;
-              ctx.fillText(config.albumName, padding, y);
+              ctx.save();
+              ctx.font = `${Math.floor(canvas.height * 0.03 * textScale)}px ${fontFam}`;
+              ctx.translate(padding, y);
+              ctx.transform(1, 0, Math.tan(-15 * Math.PI / 180), 1, 0, 0);
+              ctx.fillText(config.albumName, 0, 0);
+              ctx.restore();
             }
          }
 

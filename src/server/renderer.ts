@@ -199,11 +199,13 @@ export async function startRenderJob(id, config) {
         vizFilter = `showcqt=s=${config.width}x${config.height}:bar_h=${Math.floor(config.height * 0.2)}:axis_h=0:sono_g=4:sono_v=10`;
         break;
       case "indian-ambient":
-        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=255:gc=210:bc=50:ac=255`;
+        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=255:gc=220:bc=0:ac=255:rf=5:gf=5:bf=5`;
         break;
       case "party-flash":
-      case "chillout-flash":
         vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=210:gc=160:bc=150:ac=255`;
+        break;
+      case "chillout-flash":
+        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=180:gc=130:bc=130:ac=255:rf=5:gf=10:bf=10`;
         break;
       default:
         vizFilter = `showwaves=s=${config.width}x${config.height}:mode=cline:colors=white`;
@@ -330,7 +332,8 @@ export async function startRenderJob(id, config) {
     if (useBright) {
       const brIntensity = (config.brightnessLevel || 50) / 100;
       const maskToUse = (useOlay && useBright) ? 'a_mask2' : 'a_mask1';
-      filterComplex += `${finalBgOut}[${maskToUse}]blend=all_mode=screen:all_opacity=${brIntensity * 3}[bgw_bright];`;
+      const safeOpacity = Math.max(0, Math.min(1.0, brIntensity * 2));
+      filterComplex += `${finalBgOut}[${maskToUse}]blend=all_mode=screen:all_opacity=${safeOpacity}[bgw_bright];`;
       finalBgOut = "[bgw_bright]";
     }
     
@@ -360,9 +363,12 @@ export async function startRenderJob(id, config) {
       filterComplex += `[bgviz]copy[final1];`;
     }
     let fontFile = "font.ttf";
+    let fontFileItalic = "font_italic.ttf";
     if (config.textFont) {
       const tf = config.textFont.replace(/ /g, "_") + ".ttf";
+      const tfItalic = config.textFont.replace(/ /g, "_") + "_italic.ttf";
       const tfPath = path.join(process.cwd(), "public", tf);
+      const tfItalicPath = path.join(process.cwd(), "public", tfItalic);
       if (!fs.existsSync(tfPath)) {
         try {
           const fontCssRes = await fetch(`https://fonts.googleapis.com/css?family=${encodeURIComponent(config.textFont)}`, {
@@ -382,9 +388,34 @@ export async function startRenderJob(id, config) {
       } else {
         fontFile = tf;
       }
+      if (!fs.existsSync(tfItalicPath)) {
+        try {
+          const italicCssRes = await fetch(`https://fonts.googleapis.com/css2?family=${encodeURIComponent(config.textFont)}:ital@1`, {
+            headers: { 'User-Agent': 'curl/7.64.1' }
+          });
+          if (italicCssRes.ok) {
+            const italicCss = await italicCssRes.text();
+            const ttfMatchItalic = italicCss.match(/url\((https:\/\/[^)]+\.ttf)\)/);
+            if (ttfMatchItalic) {
+               const ttfResItalic = await fetch(ttfMatchItalic[1]);
+               const bufferItalic = await ttfResItalic.arrayBuffer();
+               fs.writeFileSync(tfItalicPath, Buffer.from(bufferItalic));
+               fontFileItalic = tfItalic;
+            } else {
+               fontFileItalic = tf; // Fallback to normal font if no TTF found
+            }
+          } else {
+            fontFileItalic = tf; // Fallback to normal font
+          }
+        } catch(e) {
+          fontFileItalic = tf;
+        }
+      } else {
+        fontFileItalic = tfItalic;
+      }
     }
     const fontPath = path.join(process.cwd(), "public", fontFile).replace(/\\/g, "/");
-    const fontPathItalic = fs.existsSync(path.join(process.cwd(), "public", "font_italic.ttf")) ? path.join(process.cwd(), "public", "font_italic.ttf").replace(/\\/g, "/") : fontPath;
+    const fontPathItalic = fs.existsSync(path.join(process.cwd(), "public", fontFileItalic)) ? path.join(process.cwd(), "public", fontFileItalic).replace(/\\/g, "/") : fontPath;
     const fontPathBold = fs.existsSync(path.join(process.cwd(), "public", "font_bold.ttf")) ? path.join(process.cwd(), "public", "font_bold.ttf").replace(/\\/g, "/") : fontPath;
     let prevOut = "[final1]";
     let filterIndex = 1;
