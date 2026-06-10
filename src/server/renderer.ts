@@ -53,7 +53,6 @@ export function killRenderJob(id) {
 }
 import { systemConfig } from "./config";
 function checkAndFreeDiskSpace() {
-  try {
     const uploadsDir = path.join(process.cwd(), "uploads");
     let totalUsedByApp = 0;
     if (fs.existsSync(uploadsDir)) {
@@ -66,8 +65,14 @@ function checkAndFreeDiskSpace() {
     const physicalFreeBytes = stats.bavail * stats.bsize;
     const requiredBufferBytes = 500 * 1024 * 1024;
     const limitBytes = systemConfig.diskLimitMB * 1024 * 1024;
+    
     if (physicalFreeBytes < requiredBufferBytes || totalUsedByApp > limitBytes) {
       console.log(`Disk management triggered. Used by app: ${Math.round(totalUsedByApp / 1024 / 1024)}MB. Limit: ${systemConfig.diskLimitMB}MB. Physical Free: ${Math.round(physicalFreeBytes / 1024 / 1024)}MB. Attempting cleanup...`);
+      
+      if (!systemConfig.autoDeleteEnabled) {
+          throw new Error(`Disk limit exceeded (${Math.round(totalUsedByApp / 1024 / 1024)}MB / ${systemConfig.diskLimitMB}MB) and auto-delete is disabled. Please free up space manually.`);
+      }
+      
       let oldestJobId = null;
       let oldestTime = Infinity;
       for (const jid in jobs) {
@@ -85,12 +90,11 @@ function checkAndFreeDiskSpace() {
         fs.unlinkSync(jobs[oldestJobId].outputPath);
         delete jobs[oldestJobId];
         console.log(`Deleted oldest video to free up space: ${oldestJobId}`);
-        checkAndFreeDiskSpace();
+        checkAndFreeDiskSpace(); // keep freeing if needed
+      } else {
+        throw new Error("Disk limit exceeded and no completed jobs found to delete for freeing up space.");
       }
     }
-  } catch (e) {
-    console.error("Failed to check disk space", e);
-  }
 }
 export async function startRenderJob(id, config) {
   jobs[id] = { id, progress: 0, status: "rendering", config, createdAt: Date.now() };

@@ -95,15 +95,18 @@ setInterval(() => {
 
 
 app.get("/api/settings", (req, res) => {
-  res.json({ diskLimitMB: systemConfig.diskLimitMB });
+  res.json({ diskLimitMB: systemConfig.diskLimitMB, autoDeleteEnabled: systemConfig.autoDeleteEnabled ?? true });
 });
 
 app.put("/api/settings", (req, res) => {
   if (req.body.diskLimitMB !== undefined) {
     systemConfig.diskLimitMB = req.body.diskLimitMB;
   }
+  if (req.body.autoDeleteEnabled !== undefined) {
+    systemConfig.autoDeleteEnabled = req.body.autoDeleteEnabled;
+  }
   saveConfig();
-  res.json({ success: true, diskLimitMB: systemConfig.diskLimitMB });
+  res.json({ success: true, diskLimitMB: systemConfig.diskLimitMB, autoDeleteEnabled: systemConfig.autoDeleteEnabled });
 });
 
 app.put("/api/settings/password", (req, res) => {
@@ -131,7 +134,7 @@ app.get("/api/disk", (req, res) => {
      const stats = fs.statfsSync(uploadsDir);
      const freeBytes = stats.bavail * stats.bsize;
      const totalBytes = stats.blocks * stats.bsize;
-     res.json({ files, freeBytes, totalBytes, diskLimitMB: systemConfig.diskLimitMB });
+     res.json({ files, freeBytes, totalBytes, diskLimitMB: systemConfig.diskLimitMB, autoDeleteEnabled: systemConfig.autoDeleteEnabled ?? true });
   } catch (e: any) {
      res.status(500).json({ error: e.message });
   }

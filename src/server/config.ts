@@ -8,7 +8,8 @@ export let systemConfig = {
   password: "admin", // default password
   mfaCode: "",
   mfaExpiry: 0,
-  totpSecret: ""
+  totpSecret: "",
+  autoDeleteEnabled: true
 };
 
 export function loadConfig() {

@@ -8,6 +8,7 @@ export function StorageManager() {
    const [freeBytes, setFreeBytes] = useState(0);
    const [totalBytes, setTotalBytes] = useState(0);
    const [diskLimitMB, setDiskLimitMB] = useState(2048);
+   const [autoDeleteEnabled, setAutoDeleteEnabled] = useState(true);
    const [loading, setLoading] = useState(true);
    const [previewTarget, setPreviewTarget] = useState<string | null>(null);
    const [uploadingFile, setUploadingFile] = useState<string | null>(null);
@@ -22,6 +23,7 @@ export function StorageManager() {
             setFreeBytes(data.freeBytes || 0);
             setTotalBytes(data.totalBytes || 1);
             setDiskLimitMB(data.diskLimitMB || 2048);
+            setAutoDeleteEnabled(data.autoDeleteEnabled ?? true);
          }
       } catch(e) {}
       setLoading(false);
@@ -40,6 +42,16 @@ export function StorageManager() {
          body: JSON.stringify({ diskLimitMB: limit })
       });
       loadStorage();
+   };
+
+   const toggleAutoDelete = async () => {
+      const newValue = !autoDeleteEnabled;
+      setAutoDeleteEnabled(newValue);
+      await fetch('/api/settings', {
+         method: 'PUT',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ autoDeleteEnabled: newValue })
+      });
    };
 
    const deleteFile = async (name: string) => {
@@ -181,8 +193,18 @@ export function StorageManager() {
                   <button onClick={() => updateLimit(diskLimitMB)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-medium transition-colors whitespace-nowrap">Save</button>
                </div>
 
+               <div className="flex items-center gap-3 mt-4 pt-4 border-t border-zinc-800">
+                  <span className="text-sm text-zinc-300 font-medium flex-1">Auto Delete Oldest Files</span>
+                  <button 
+                     onClick={toggleAutoDelete}
+                     className={`w-12 h-6 rounded-full relative transition-colors ${autoDeleteEnabled ? 'bg-indigo-500' : 'bg-zinc-700'}`}
+                  >
+                     <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${autoDeleteEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
+               </div>
+
                <p className="text-xs text-zinc-500 mt-3 leading-relaxed">
-                  Maximum storage allowed before the engine automatically deletes the oldest completed videos to make space for new render jobs.
+                  Maximum storage allowed before the engine {autoDeleteEnabled ? 'automatically deletes the oldest completed videos to make space for new render jobs.' : 'stops new render jobs if you exceed the limit.'}
                </p>
             </div>
          </div>
