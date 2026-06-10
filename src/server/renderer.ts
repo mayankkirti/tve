@@ -366,8 +366,16 @@ export async function startRenderJob(id, config) {
     if (useBright) {
       const brIntensity = (config.brightnessLevel || 50) / 100;
       const maskToUse = (useOlay && useBright) ? 'a_mask2' : 'a_mask1';
-      const safeOpacity = Math.max(0, Math.min(0.5, brIntensity * 0.8)); // Capped at 50% and scaled down to prevent overexposure
-      filterComplex += `${finalBgOut}[${maskToUse}]blend=all_mode=screen:all_opacity=${safeOpacity}[bgw_bright];`;
+      
+      let brightInput = maskToUse;
+      if (config.brightnessColorful) {
+          filterComplex += `color=c=red:s=${config.width}x${config.height}:r=${config.fps},hue=h='t*200',format=gbrp[colorful_base];`;
+          filterComplex += `[colorful_base][${maskToUse}]blend=all_mode=multiply[colorful_mask];`;
+          brightInput = 'colorful_mask';
+      }
+      
+      const safeOpacity = Math.max(0, Math.min(1.0, brIntensity * 1.5));
+      filterComplex += `${finalBgOut}[${brightInput}]blend=all_mode=addition:all_opacity=${safeOpacity}[bgw_bright];`;
       finalBgOut = "[bgw_bright]";
     }
     
@@ -387,9 +395,9 @@ export async function startRenderJob(id, config) {
       filterComplex += `[viz][grad_gbrp]blend=all_mode=multiply[viz_color];`;
       filterComplex += `${finalBgOut}[viz_color]blend=all_mode=screen[bgviz];`;
     } else if (config.style === "minimal-fast") {
-      filterComplex += `${finalBgOut}[viz]overlay=(W-w)/2:H-h-50[bgviz];`;
+      filterComplex += `[viz]pad=${config.width}:${config.height}:(ow-iw)/2:oh-ih-50:color=black[vizpad];${finalBgOut}[vizpad]blend=all_mode=screen[bgviz];`;
     } else {
-      filterComplex += `${finalBgOut}[viz]overlay=(W-w)/2:(H-h)/2[bgviz];`;
+      filterComplex += `${finalBgOut}[viz]blend=all_mode=screen[bgviz];`;
     }
     if (config.logoPath) {
       const sizeVal = config.logoSize || 100;
