@@ -346,7 +346,7 @@ export async function startRenderJob(id, config) {
     if (needsAudioMask) {
       filterComplex += `[0:a]asplit=2[a_viz][a_mask_in];`;
       filterComplex += `[a_viz]${vizFilter},format=gbrp[viz];`;
-      filterComplex += `[a_mask_in]aformat=channel_layouts=mono,compand,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_base];`;
+      filterComplex += `[a_mask_in]aformat=channel_layouts=mono,compand,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,colorlevels=rimin=0.0:rimax=0.1:gimin=0.0:gimax=0.1:bimin=0.0:bimax=0.1,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_base];`;
       if (useOlay && useBright) {
          filterComplex += `[a_mask_base]split=2[a_mask1][a_mask2];`;
       } else {
@@ -369,7 +369,7 @@ export async function startRenderJob(id, config) {
       
       let brightInput = maskToUse;
       if (config.brightnessColorful) {
-          filterComplex += `color=c=red:s=${config.width}x${config.height}:r=${config.fps},hue=h='t*200',format=gbrp[colorful_base];`;
+          filterComplex += `color=c=red:s=${config.width}x${config.height}:r=${config.fps},hue=h='t*1200',format=gbrp[colorful_base];`;
           filterComplex += `[colorful_base][${maskToUse}]blend=all_mode=multiply[colorful_mask];`;
           brightInput = 'colorful_mask';
       }
@@ -395,7 +395,7 @@ export async function startRenderJob(id, config) {
       filterComplex += `[viz][grad_gbrp]blend=all_mode=multiply[viz_color];`;
       filterComplex += `${finalBgOut}[viz_color]blend=all_mode=screen[bgviz];`;
     } else if (config.style === "minimal-fast") {
-      filterComplex += `[viz]pad=${config.width}:${config.height}:(ow-iw)/2:oh-ih-50:color=black[vizpad];${finalBgOut}[vizpad]blend=all_mode=screen[bgviz];`;
+      filterComplex += `[viz]format=rgba,colorkey=black:0.1:0.1[viztrans];${finalBgOut}[viztrans]overlay=(W-w)/2:H-h-50[bgviz];`;
     } else {
       filterComplex += `${finalBgOut}[viz]blend=all_mode=screen[bgviz];`;
     }

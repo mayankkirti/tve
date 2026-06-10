@@ -603,21 +603,23 @@ export async function renderVideoTask(
          ctx.fillStyle = `rgba(0, 0, 0, ${currentOverlayAlpha})`;
          ctx.fillRect(0, 0, canvas.width, canvas.height);
          
-         // If brightness is even stronger than making overlay transparent, add white flashes!
-         if (config.brightnessEnabled) {
+         // Strong brightness flash
+         if (config.brightnessEnabled && config.style !== 'minimal-fast') {
               const bl = config.brightnessLevel !== undefined ? config.brightnessLevel : 50;
-              const audioLight = normalizedReactivity * (bl / 50);
-              const extraWhite = audioLight - (config.overlayOpacity !== undefined ? config.overlayOpacity / 100 : 0.5);
-              if (extraWhite > 0) {
+              let flashAlpha = normalizedReactivity * (bl / 50) * 0.8;
+              flashAlpha = Math.min(1.0, flashAlpha * flashAlpha); // Curve for snappier flashing
+              
+              if (flashAlpha > 0.05) {
+                  ctx.save();
                   ctx.globalCompositeOperation = 'screen';
                   if (config.brightnessColorful) {
-                      const hue = Math.floor((normalizedReactivity * 360 + currentTime * 200) % 360);
-                      ctx.fillStyle = `hsla(${hue}, 100%, 65%, ${Math.min(1, extraWhite * 1.5)})`;
+                      const hue = Math.floor((currentTime * 1200 + normalizedReactivity * 360) % 360);
+                      ctx.fillStyle = `hsla(${hue}, 100%, 65%, ${flashAlpha})`;
                   } else {
-                      ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, extraWhite * 1.5)})`;
+                      ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
                   }
                   ctx.fillRect(0, 0, canvas.width, canvas.height);
-                  ctx.globalCompositeOperation = 'source-over';
+                  ctx.restore();
               }
          }
 
@@ -635,30 +637,6 @@ export async function renderVideoTask(
          const rayHeight = Math.max(1, canvas.height * 0.003 + normalizedReactivity * 6);
          ctx.fillRect(canvas.width * 0.1, rayY - rayHeight/2, canvas.width * 0.8, rayHeight);
          ctx.restore();
-
-         if (config.brightnessIntensity && config.brightnessIntensity > 0 && config.style !== 'minimal-fast') {
-            ctx.save();
-            let intensityAlpha = normalizedReactivity * config.brightnessIntensity * 0.4;
-            if (config.style === 'party-flash' || config.style === 'chillout-flash') {
-                // sudden flashes without over whitish
-                if (config.style === 'party-flash') {
-                    intensityAlpha = normalizedReactivity > 0.75 ? 0.3 + (normalizedReactivity * 0.3) : normalizedReactivity * 0.1;
-                } else {
-                    intensityAlpha = normalizedReactivity > 0.75 ? 0.15 + (normalizedReactivity * 0.15) : normalizedReactivity * 0.05;
-                }
-            } else if (config.style === 'psychedelic') {
-                intensityAlpha *= 0.3; // Much lower brightness for psychedelic
-            }
-            if (config.brightnessColorful) {
-                const hue = Math.floor((normalizedReactivity * 180 + currentTime * 50) % 360);
-                ctx.fillStyle = `hsla(${hue}, 100%, 70%, ${intensityAlpha})`;
-            } else {
-                ctx.fillStyle = `rgba(255, 255, 255, ${intensityAlpha})`;
-            }
-            ctx.globalCompositeOperation = 'screen';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.restore();
-         }
 
          if (config.style !== 'minimal-fast') {
              ctx.save();
