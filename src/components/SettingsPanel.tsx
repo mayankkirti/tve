@@ -481,13 +481,26 @@ export function SettingsPanel({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block">Brightness (Audio Reactive) ({config.brightnessLevel}%)</label>
-              <button
-                type="button"
-                onClick={() => setConfig(prev => ({ ...prev, brightnessEnabled: !prev.brightnessEnabled }))}
-                className={`text-xs px-2 py-1 rounded transition-colors ${config.brightnessEnabled ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'}`}
-              >
-                {config.brightnessEnabled ? 'Enabled' : 'Disabled'}
-              </button>
+              <div className="flex items-center gap-2">
+                {config.brightnessEnabled && (
+                  <label className="flex items-center gap-1 text-xs text-zinc-300 cursor-pointer border border-zinc-700 px-2 py-1 rounded bg-zinc-800">
+                    <input 
+                      type="checkbox" 
+                      checked={config.brightnessColorful || false}
+                      onChange={(e) => setConfig(prev => ({ ...prev, brightnessColorful: e.target.checked }))}
+                      className="w-3 h-3 accent-indigo-500"
+                    />
+                    Colorful
+                  </label>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setConfig(prev => ({ ...prev, brightnessEnabled: !prev.brightnessEnabled }))}
+                  className={`text-xs px-2 py-1 rounded transition-colors ${config.brightnessEnabled ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'}`}
+                >
+                  {config.brightnessEnabled ? 'Enabled' : 'Disabled'}
+                </button>
+              </div>
             </div>
             <input 
               type="range" 

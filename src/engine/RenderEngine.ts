@@ -556,9 +556,10 @@ export async function renderVideoTask(
                 
                 if (partyGlitch) {
                     if (config.style === 'party-flash') {
-                        ctx.filter = `hue-rotate(${Math.random()*360}deg) saturate(200%)`;
+                        // avoid ctx.filter which can break image rendering completely
+                        ctx.globalCompositeOperation = 'screen';
                     } else {
-                        ctx.filter = `saturate(80%) blur(${Math.random() * 2}px)`;
+                        ctx.globalAlpha = 0.8;
                     }
                 }
 
@@ -598,8 +599,9 @@ export async function renderVideoTask(
          // Universal background darkening and audio brightness
          let currentOverlayAlpha = config.overlayOpacity !== undefined ? config.overlayOpacity / 100 : 0.5;
          
-         if (config.brightnessEnabled && config.brightnessLevel > 0) {
-              const audioLight = normalizedReactivity * (config.brightnessLevel / 100);
+         if (config.brightnessEnabled) {
+              const bl = config.brightnessLevel !== undefined ? config.brightnessLevel : 50;
+              const audioLight = normalizedReactivity * (bl / 50); // Scale up impact
               currentOverlayAlpha = Math.max(0, currentOverlayAlpha - audioLight);
          }
 
@@ -607,12 +609,20 @@ export async function renderVideoTask(
          ctx.fillRect(0, 0, canvas.width, canvas.height);
          
          // If brightness is even stronger than making overlay transparent, add white flashes!
-         if (config.brightnessEnabled && config.brightnessLevel > 0) {
-              const audioLight = normalizedReactivity * (config.brightnessLevel / 100);
+         if (config.brightnessEnabled) {
+              const bl = config.brightnessLevel !== undefined ? config.brightnessLevel : 50;
+              const audioLight = normalizedReactivity * (bl / 50);
               const extraWhite = audioLight - (config.overlayOpacity !== undefined ? config.overlayOpacity / 100 : 0.5);
               if (extraWhite > 0) {
-                  ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, extraWhite * 0.5)})`;
+                  ctx.globalCompositeOperation = 'screen';
+                  if (config.brightnessColorful) {
+                      const hue = Math.floor((normalizedReactivity * 180 + currentTime * 50) % 360);
+                      ctx.fillStyle = `hsla(${hue}, 100%, 70%, ${Math.min(1, extraWhite * 0.4)})`;
+                  } else {
+                      ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, extraWhite * 0.4)})`;
+                  }
                   ctx.fillRect(0, 0, canvas.width, canvas.height);
+                  ctx.globalCompositeOperation = 'source-over';
               }
          }
 

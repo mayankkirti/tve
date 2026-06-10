@@ -35,6 +35,7 @@ export const createDefaultConfig = (): VideoConfig => ({
   bgZoomEnabled: true,
   bgZoomLevel: 50,
   brightnessEnabled: true,
+  brightnessColorful: false,
   brightnessLevel: 50,
   channelName: 'Trisha Frequencies',
   albumName: '',

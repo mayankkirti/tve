@@ -37,6 +37,7 @@ export interface VideoConfig {
   bgZoomEnabled: boolean;
   bgZoomLevel: number;
   brightnessEnabled: boolean;
+  brightnessColorful?: boolean;
   brightnessLevel: number; // 15, 20, 24, 30, 60
   channelName: string;
   albumName: string;
