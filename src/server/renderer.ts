@@ -21,6 +21,9 @@ async function checkBackpressure() {
     check();
   });
 }
+export function getActiveRenderThreads() {
+  return activeRenderThreads;
+}
 export function pauseRenderJob(id) {
   if (activeCommands[id]) {
     try {
@@ -142,6 +145,11 @@ export async function startRenderJob(id, config) {
     } catch (e) {
       console.log("FFmpeg duration parse error:", e);
     }
+
+    if (config.audioCropEnabled && config.audioCropStart >= 0 && config.audioCropEnd > config.audioCropStart) {
+      totalSeconds = config.audioCropEnd - config.audioCropStart;
+    }
+
     let command = ffmpeg();
     try {
       execSync(`"${ffmpegInstaller.path}" -v error -i "${finalAudioPath}" -t 1 -f null -`, {encoding: "utf8"});
@@ -149,7 +157,14 @@ export async function startRenderJob(id, config) {
       console.log("Probe err:", e.message);
       throw new Error("Audio file is missing or invalid format (Could be a Google Drive auth page or corrupted file). Please make sure the file is valid media and public.");
     }
+    
     command = command.input(finalAudioPath);
+    if (config.audioCropEnabled && config.audioCropStart >= 0 && config.audioCropEnd > config.audioCropStart) {
+      command = command.inputOptions([
+         `-ss ${config.audioCropStart}`,
+         `-t ${config.audioCropEnd - config.audioCropStart}`
+      ]);
+    }
     let bgScale = `scale=${config.width}:${config.height}:force_original_aspect_ratio=decrease,pad=${config.width}:${config.height}:(ow-iw)/2:(oh-ih)/2`;
     if (config.bgZoomEnabled) {
       const zspeed = (config.bgZoomLevel || 50) / 1e4;

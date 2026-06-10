@@ -116,17 +116,25 @@ export function useRenderQueue(youtubeToken?: string | null, autoUploadYT?: bool
                   if (res.ok) {
                      const data = await res.json();
                      if (data.status) {
+                        let finalStatus = data.status;
+                        if (finalStatus === 'error') finalStatus = 'failed';
                         updateJob(job.id, {
                            progress: data.progress || 0,
                            error: data.error,
                            etaMilliseconds: data.etaMilliseconds,
-                           status: data.status, ...(data.status === 'completed' || data.status === 'failed' ? { 
+                           status: finalStatus, ...(data.status === 'completed' || data.status === 'failed' || data.status === 'error' ? { 
                               blobUrl: data.status === 'completed' ? `/api/jobs/${job.backendId}/download` : undefined, 
                               progress: data.status === 'completed' ? 100 : job.progress,
                               endTime: job.endTime || Date.now()
                            } : {})
                         });
                      }
+                  } else if (res.status === 404) {
+                     updateJob(job.id, {
+                        status: 'failed',
+                        error: 'Job not found on server (server restarted or cleared). Please retry.',
+                        endTime: job.endTime || Date.now()
+                     });
                   }
                 } catch(e) {}
              }

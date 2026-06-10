@@ -4,7 +4,7 @@ import { createServer as createViteServer } from "vite";
 import multer from "multer";
 import * as fs from "fs";
 import { v4 as uuidv4 } from "uuid";
-import { startRenderJob, jobs, killRenderJob, pauseRenderJob, resumeRenderJob } from "./src/server/renderer";
+import { startRenderJob, jobs, killRenderJob, pauseRenderJob, resumeRenderJob, getActiveRenderThreads } from "./src/server/renderer";
 import { saveJobs } from "./src/server/jobStore";
 import { systemConfig, saveConfig } from "./src/server/config";
 import { generateSecret, generateURI, verifySync } from "otplib";
@@ -20,8 +20,16 @@ let activeTokens = new Set<string>();
 try { if (fs.existsSync('active_tokens.json')) activeTokens = new Set(JSON.parse(fs.readFileSync('active_tokens.json', 'utf8'))); } catch(e){}
 const saveTokens = () => fs.writeFileSync('active_tokens.json', JSON.stringify([...activeTokens]));
 
+let globalHost = "";
+app.use((req, res, next) => {
+  if (!globalHost && req.headers.host && !req.headers.host.includes("localhost")) {
+    globalHost = req.headers.host;
+  }
+  next();
+});
+
 const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (req.path === '/api/login' || req.path === '/api/verify-mfa' || !req.path.startsWith('/api') || req.path.startsWith('/api/uploads') || req.path.match(/^\/api\/jobs\/[^/]+\/download$/)) {
+  if (req.path === '/api/login' || req.path === '/api/keep-alive' || req.path === '/api/verify-mfa' || !req.path.startsWith('/api') || req.path.startsWith('/api/uploads') || req.path.match(/^\/api\/jobs\/[^/]+\/download$/)) {
     return next();
   }
   
@@ -272,6 +280,26 @@ app.post("/api/upload-chunk", upload.single("chunk"), (req, res) => {
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
+
+app.get("/api/keep-alive", (req, res) => {
+  // Hang response for 25 seconds to act as a keep-alive background worker request
+  setTimeout(() => res.json({ status: "ok" }), 25000); 
+});
+
+async function keepAliveLoop() {
+  while (true) {
+    if (globalHost && getActiveRenderThreads() > 0) {
+      try {
+        await fetch(`https://${globalHost}/api/keep-alive`);
+      } catch(e) {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    } else {
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+}
+keepAliveLoop();
 
 app.post("/api/cleanup", (req, res) => {
   for (const id in jobs) {

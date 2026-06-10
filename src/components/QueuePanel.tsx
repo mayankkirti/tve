@@ -58,10 +58,9 @@ export function QueuePanel({
           <div className="flex items-center gap-2">
             <button
                onClick={async () => {
+                 if (!window.confirm("Are you sure you want to cleanup the server? This will kill running jobs and remove everything.")) return;
                  try {
                     await fetch('/api/cleanup', { method: 'POST' });
-                    // Provide some fast local optimistic update or let user figure it out, but they asked for server cleanup.
-                    // To do local we would need a clearJobs fn from useRenderQueue, but let's just alert
                     window.location.reload(); 
                  } catch(e) {}
                }}
