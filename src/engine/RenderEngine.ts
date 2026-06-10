@@ -555,12 +555,7 @@ export async function renderVideoTask(
                 finalScale *= blastScale;
                 
                 if (partyGlitch) {
-                    if (config.style === 'party-flash') {
-                        // avoid ctx.filter which can break image rendering completely
-                        ctx.globalCompositeOperation = 'screen';
-                    } else {
-                        ctx.globalAlpha = 0.8;
-                    }
+                    // glitch motion already implemented via translation/scaling
                 }
 
                 ctx.translate(canvas.width/2, canvas.height/2);
@@ -654,7 +649,12 @@ export async function renderVideoTask(
             } else if (config.style === 'psychedelic') {
                 intensityAlpha *= 0.3; // Much lower brightness for psychedelic
             }
-            ctx.fillStyle = `rgba(255, 255, 255, ${intensityAlpha})`;
+            if (config.brightnessColorful) {
+                const hue = Math.floor((normalizedReactivity * 180 + currentTime * 50) % 360);
+                ctx.fillStyle = `hsla(${hue}, 100%, 70%, ${intensityAlpha})`;
+            } else {
+                ctx.fillStyle = `rgba(255, 255, 255, ${intensityAlpha})`;
+            }
             ctx.globalCompositeOperation = 'screen';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.restore();
