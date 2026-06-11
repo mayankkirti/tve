@@ -1,4 +1,4 @@
-export type VisualizerStyle = 'chillout' | 'psychedelic' | 'abstract' | 'indian-ambient' | 'party-flash' | 'chillout-flash' | 'minimal-fast';
+export type VisualizerStyle = 'none' | 'chillout' | 'psychedelic' | 'abstract' | 'indian-ambient' | 'party-flash' | 'chillout-flash' | 'minimal-fast' | 'classic-orbs' | 'soft-bokeh' | 'twinkling-dust' | 'drifting-motes' | 'cinematic-light-leaks' | 'falling-snow-ash' | 'starfield-hyperdrive' | 'rolling-fog';
 
 export interface Resolution {
   width: number;

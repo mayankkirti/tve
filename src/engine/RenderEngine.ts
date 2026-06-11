@@ -96,16 +96,13 @@ class Particle {
       this.speedX = (Math.random() - 0.5) * 4;
       this.speedY = (Math.random() - 0.5) * 4;
     } else if (style === 'party-flash' || style === 'chillout-flash') {
-      // Flashing dust, neon lights, minute meteor shower
       const r = Math.random();
       if (r < 0.2) {
-         // Meteor
          this.color = `rgba(255, 255, 255, ${this.alpha + 0.4})`;
          this.speedX = Math.random() * 10 - 5;
          this.speedY = Math.random() * 10 + 5;
          this.size = Math.random() * 4 + 2;
       } else if (r < 0.5) {
-         // Neon lights or ambient glow
          if (style === 'party-flash') {
             const colors = ['#0ff', '#f0f', '#ff0'];
             this.color = colors[Math.floor(Math.random() * colors.length)];
@@ -119,7 +116,6 @@ class Particle {
          }
          this.size = Math.random() * 6 + 4;
       } else {
-         // Flashing dust
          if (style === 'chillout-flash') {
             this.color = `rgba(200, 200, 200, ${this.alpha})`;
          } else {
@@ -129,6 +125,60 @@ class Particle {
          this.speedY = -Math.random() * 4 - 2;
          this.size = Math.random() * 3 + 1;
       }
+    } else if (style === 'classic-orbs') {
+      const hues = [200, 220, 240, 260, 280, 300];
+      const selectedHue = hues[Math.floor(Math.random() * hues.length)];
+      this.color = `hsla(${selectedHue}, 80%, 70%, ${this.alpha * 0.4})`;
+      this.size = Math.random() * 80 + 20;
+      this.speedX = (Math.random() - 0.5) * 0.4;
+      this.speedY = (Math.random() - 0.5) * 0.4;
+    } else if (style === 'soft-bokeh') {
+      const hues = [30, 45, 60, 15, 300];
+      const selectedHue = hues[Math.floor(Math.random() * hues.length)];
+      this.color = `hsla(${selectedHue}, 100%, 75%, ${this.alpha * 0.5})`;
+      this.size = Math.random() * 150 + 50;
+      this.speedX = (Math.random() - 0.5) * 0.2;
+      this.speedY = (Math.random() - 0.5) * 0.2;
+    } else if (style === 'twinkling-dust') {
+      this.color = `rgba(255, 255, 255, ${this.alpha})`;
+      this.size = Math.random() * 2 + 0.5;
+      this.speedX = (Math.random() - 0.5) * 0.5;
+      this.speedY = (Math.random() - 0.5) * 0.5;
+    } else if (style === 'drifting-motes') {
+      this.color = `rgba(240, 230, 210, ${this.alpha * 0.8})`;
+      this.size = Math.random() * 6 + 2;
+      this.speedX = (Math.random() - 0.2) * 1.5;
+      this.speedY = (Math.random() - 0.5) * 1.5;
+    } else if (style === 'cinematic-light-leaks') {
+      this.color = `rgba(255, ${Math.random()*100+100}, ${Math.random()*50}, ${this.alpha * 0.3})`;
+      this.size = Math.random() * (w * 0.8) + (w * 0.4);
+      this.speedX = (Math.random() - 0.5) * 5;
+      this.speedY = (Math.random() - 0.5) * 1;
+    } else if (style === 'falling-snow-ash') {
+      const isAsh = Math.random() > 0.7;
+      this.color = isAsh ? `rgba(150, 150, 150, ${this.alpha})` : `rgba(255, 255, 255, ${this.alpha})`;
+      this.size = Math.random() * 4 + (isAsh ? 1 : 2);
+      this.speedY = Math.random() * 3 + 1;
+      this.speedX = (Math.random() - 0.5) * 2;
+    } else if (style === 'starfield-hyperdrive') {
+      this.color = `rgba(255, 255, 255, ${this.alpha})`;
+      this.size = Math.random() * 2 + 0.5;
+      // Start near center
+      this.x = w / 2 + (Math.random() - 0.5) * w * 0.8;
+      this.y = h / 2 + (Math.random() - 0.5) * h * 0.8;
+      
+      const dx = this.x - w / 2;
+      const dy = this.y - h / 2;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      
+      this.speedX = (dx / dist) * (Math.random() * 2 + 0.1);
+      this.speedY = (dy / dist) * (Math.random() * 2 + 0.1);
+    } else if (style === 'rolling-fog') {
+      this.size = Math.random() * (w * 0.5) + w * 0.2; // Large fog puffs
+      this.alpha = Math.random() * 0.05 + 0.01; // Very faint
+      this.color = `rgba(200, 220, 255, ${this.alpha})`;
+      this.speedX = Math.random() * 1.5 + 0.5; // Wind blowing right
+      this.speedY = (Math.random() - 0.5) * 0.5;
     } else { // abstract
       this.color = `rgba(255, 255, 255, ${this.alpha})`;
       this.size = Math.random() * 100 + 40; // Base size for lens distortion
@@ -137,20 +187,44 @@ class Particle {
     }
   }
 
-  update(w: number, h: number, reactivityData: number) {
-    if (this.color.includes('rgba(220, 200, 180')) { // indian-ambient
+  update(w: number, h: number, reactivityData: number, style: string) {
+    if (style === 'indian-ambient' || style === 'rolling-fog') {
         this.x += this.speedX * (1 + reactivityData * 1.5);
         this.y += this.speedY;
+    } else if (style === 'starfield-hyperdrive') {
+        const speed = 1 + reactivityData * 5;
+        this.x += this.speedX * speed;
+        this.y += this.speedY * speed;
+        // Also increase speed as it goes further out
+        this.speedX *= 1.05;
+        this.speedY *= 1.05;
+        this.size *= 1.02;
+    } else if (style === 'cinematic-light-leaks') {
+        this.x += this.speedX * (1 + reactivityData);
+        this.y += this.speedY * (1 + reactivityData);
     } else {
         this.x += this.speedX * (1 + reactivityData * 2);
         this.y += this.speedY * (1 + reactivityData * 2);
     }
     this.time += 0.1;
 
-    if (this.x > w + this.size) this.x = -this.size;
-    if (this.x < -this.size) this.x = w + this.size;
-    if (this.y > h + this.size) this.y = -this.size;
-    if (this.y < -this.size) this.y = h + this.size;
+    if (style === 'starfield-hyperdrive') {
+       if (this.x > w || this.x < 0 || this.y > h || this.y < 0) {
+          this.x = w / 2 + (Math.random() - 0.5) * w * 0.1;
+          this.y = h / 2 + (Math.random() - 0.5) * h * 0.1;
+          const dx = this.x - w / 2;
+          const dy = this.y - h / 2;
+          const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+          this.speedX = (dx / dist) * (Math.random() * 2 + 0.1);
+          this.speedY = (dy / dist) * (Math.random() * 2 + 0.1);
+          this.size = Math.random() * 2 + 0.5;
+       }
+    } else {
+        if (this.x > w + this.size) this.x = -this.size;
+        if (this.x < -this.size) this.x = w + this.size;
+        if (this.y > h + this.size) this.y = -this.size;
+        if (this.y < -this.size) this.y = h + this.size;
+    }
   }
 
   draw(ctx: CanvasRenderingContext2D, reactivityData: number, style: string) {
@@ -178,6 +252,58 @@ class Particle {
         ctx.fillStyle = this.color.replace(/[\d.]+\)$/g, `${Math.min(1, currentAlpha)})`);
         ctx.arc(this.x, this.y, this.size * (1 + reactivityData), 0, Math.PI * 2);
         ctx.fill();
+    } else if (style === 'classic-orbs' || style === 'soft-bokeh') {
+        const rad = this.size * (1 + reactivityData * 0.5);
+        currentAlpha = Math.max(0, this.alpha * (1 + Math.sin(this.time) * 0.5));
+        const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, rad);
+        const centerColor = this.color.replace(/[\d.]+\)$/g, `${currentAlpha})`);
+        const edgeColor = this.color.replace(/[\d.]+\)$/g, `0)`);
+        grad.addColorStop(0, centerColor);
+        grad.addColorStop(style === 'classic-orbs' ? 0.7 : 0.4, centerColor);
+        grad.addColorStop(1, edgeColor);
+        ctx.fillStyle = grad;
+        ctx.globalCompositeOperation = 'screen';
+        ctx.arc(this.x, this.y, rad, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+    } else if (style === 'drifting-motes' || style === 'twinkling-dust' || style === 'falling-snow-ash') {
+        currentAlpha = Math.max(0, this.alpha * (0.5 + 0.5 * Math.sin(this.time * (style === 'twinkling-dust' ? 5 : 1))));
+        ctx.fillStyle = this.color.replace(/[\d.]+\)$/g, `${currentAlpha})`);
+        ctx.arc(this.x, this.y, this.size * (1 + reactivityData * 0.2), 0, Math.PI * 2);
+        ctx.fill();
+    } else if (style === 'cinematic-light-leaks') {
+        // Large sweeping light leaks
+        const currentAlpha = Math.max(0, this.alpha * (0.5 + 0.5 * Math.sin(this.time * 0.2 + reactivityData * 0.5)));
+        const grad = ctx.createLinearGradient(this.x - this.size, this.y, this.x + this.size, this.y + this.size);
+        grad.addColorStop(0, this.color.replace(/[\d.]+\)$/g, `0)`));
+        grad.addColorStop(0.5, this.color.replace(/[\d.]+\)$/g, `${currentAlpha})`));
+        grad.addColorStop(1, this.color.replace(/[\d.]+\)$/g, `0)`));
+        ctx.fillStyle = grad;
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fillRect(this.x - this.size, this.y - this.size, this.size * 2, this.size * 2);
+        ctx.globalCompositeOperation = 'source-over';
+    } else if (style === 'starfield-hyperdrive') {
+        ctx.fillStyle = this.color;
+        
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x - this.speedX * 3, this.y - this.speedY * 3);
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = this.size;
+        ctx.stroke();
+    } else if (style === 'rolling-fog') {
+        // Fog effect with radial gradient
+        currentAlpha = Math.max(0, this.alpha * (0.8 + 0.4 * reactivityData));
+        const rad = this.size * (1 + reactivityData * 0.1);
+        const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, rad);
+        grad.addColorStop(0, this.color.replace(/[\d.]+\)$/g, `${currentAlpha})`));
+        grad.addColorStop(0.5, this.color.replace(/[\d.]+\)$/g, `${currentAlpha * 0.5})`));
+        grad.addColorStop(1, this.color.replace(/[\d.]+\)$/g, `0)`));
+        ctx.fillStyle = grad;
+        ctx.globalCompositeOperation = 'screen';
+        ctx.arc(this.x, this.y, rad, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
     } else if (style === 'abstract') {
         // Will be drawn as a magnifying lens manually from the rendering loop
     } else {
@@ -268,8 +394,20 @@ export async function renderVideoTask(
       const ctx = canvas.getContext('2d', { alpha: false })!;
 
       const particles: Particle[] = [];
-      if (config.style !== 'minimal-fast') {
-          const numParticles = config.style === 'abstract' ? 20 : (config.style === 'psychedelic' ? 300 : (config.style === 'indian-ambient' ? 150 : 100));
+      if (config.style !== 'minimal-fast' && config.style !== 'none') {
+          let numParticles = 100;
+          if (config.style === 'abstract') numParticles = 20;
+          else if (config.style === 'psychedelic') numParticles = 300;
+          else if (config.style === 'indian-ambient') numParticles = 150;
+          else if (config.style === 'twinkling-dust') numParticles = 300;
+          else if (config.style === 'falling-snow-ash') numParticles = 250;
+          else if (config.style === 'starfield-hyperdrive') numParticles = 400;
+          else if (config.style === 'classic-orbs') numParticles = 80;
+          else if (config.style === 'soft-bokeh') numParticles = 60;
+          else if (config.style === 'drifting-motes') numParticles = 150;
+          else if (config.style === 'cinematic-light-leaks') numParticles = 10;
+          else if (config.style === 'rolling-fog') numParticles = 30;
+
           for (let i = 0; i < numParticles; i++) {
             particles.push(new Particle(canvas.width, canvas.height, config.style));
           }
@@ -637,64 +775,24 @@ export async function renderVideoTask(
               const r = config.flashRelease !== undefined ? config.flashRelease : 0.1;
               const dt = 1 / fps;
 
-              const getBandEnergy = (minHz: number, maxHz: number) => {
-                  if (!audioContext) return 0;
-                  const nyquist = audioContext.sampleRate / 2;
-                  const minIdx = Math.floor(minHz / nyquist * bufferLength);
-                  const maxIdx = Math.floor(maxHz / nyquist * bufferLength);
-                  let tempSum = 0;
-                  for(let i=minIdx; i<=maxIdx && i<bufferLength; i++) {
-                      tempSum += dataArray[i];
-                  }
-                  return tempSum / Math.max(1, maxIdx - minIdx + 1) / 255;
-              };
-
-              const stepEnv = (target: number, current: number) => {
-                  if (target > current) {
-                      return current + (target - current) * (1 - Math.exp(-dt / Math.max(0.001, a)));
-                  } else {
-                      return current + (target - current) * (1 - Math.exp(-dt / Math.max(0.001, r)));
-                  }
-              };
-
               ctx.save();
               ctx.globalCompositeOperation = 'color-dodge';
 
               if (config.brightnessColorful) {
-                  const mapVal = (v: number) => Math.max(0, (v - thresh) / (1 - thresh));
-                  const p = config.flashPeak ?? 0.5;
-
-                  flashEnv.f100 = stepEnv(mapVal(getBandEnergy(60, 180)), flashEnv.f100);
-                  const intensity = flashEnv.f100;
-
+                  const intensity = Math.min(1, beatFlash * 1.5);
                   if (intensity > 0) {
-                      const v_cw = getBandEnergy(2000, 4000);
-                      const v_cr = getBandEnergy(4000, 6000);
-                      const v_cg = getBandEnergy(6000, 8000);
-                      const v_cb = getBandEnergy(8000, 12000);
-                      
-                      const maxV = Math.max(v_cw, v_cr, v_cg, v_cb, 0.001);
-                      const r = Math.min(255, ((v_cw + v_cr) / maxV) * 255);
-                      const g = Math.min(255, ((v_cw + v_cg) / maxV) * 255);
-                      const b = Math.min(255, ((v_cw + v_cb) / maxV) * 255);
+                      const r = Math.min(255, 100 + Math.random() * 155);
+                      const g = Math.min(255, 100 + Math.random() * 155);
+                      const b = Math.min(255, 100 + Math.random() * 155);
 
                       ctx.globalCompositeOperation = 'lighter';
-                      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${intensity * p})`;
+                      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${intensity * 0.5})`;
                       ctx.fillRect(0, 0, canvas.width, canvas.height);
                   }
               } else {
                   ctx.globalCompositeOperation = 'lighter';
-                  const p = config.flashPeak ?? 0.5;
-                  const mapVal = (v: number) => Math.max(0, (v - thresh) / (1 - thresh));
-                  flashEnv.f100 = stepEnv(mapVal(getBandEnergy(60, 180)), flashEnv.f100);
-                  flashEnv.f50 = stepEnv(mapVal(getBandEnergy(0, 80)), flashEnv.f50);
-                  
-                  if (flashEnv.f100 > 0) {
-                      ctx.fillStyle = `rgba(255, 255, 255, ${flashEnv.f100 * p})`;
-                      ctx.fillRect(0, 0, canvas.width, canvas.height);
-                  }
-                  if (flashEnv.f50 > 0) {
-                      ctx.fillStyle = `rgba(255, 255, 255, ${flashEnv.f50 * p * 0.5})`;
+                  if (beatFlash > 0.1) {
+                      ctx.fillStyle = `rgba(255, 255, 255, ${beatFlash * 0.5})`;
                       ctx.fillRect(0, 0, canvas.width, canvas.height);
                   }
               }
@@ -702,22 +800,22 @@ export async function renderVideoTask(
               ctx.restore();
          }
 
-         // Floating thin ray of light (center-left to center-right)
-         ctx.save();
-         ctx.globalCompositeOperation = 'screen';
-         const rayY = canvas.height * 0.5 + Math.sin(currentTime * 0.7) * (canvas.height * 0.05);
-         const gradient = ctx.createLinearGradient(canvas.width * 0.1, 0, canvas.width * 0.9, 0);
-         gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
-         const glowPos = (Math.sin(currentTime * 0.4) + 1) / 2; // moves back and forth 0..1
-         gradient.addColorStop(Math.max(0.01, Math.min(0.99, glowPos)), `rgba(255, 255, 255, ${0.3 + normalizedReactivity * 0.5})`);
-         gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-         
-         ctx.fillStyle = gradient;
-         const rayHeight = Math.max(1, canvas.height * 0.003 + normalizedReactivity * 6);
-         ctx.fillRect(canvas.width * 0.1, rayY - rayHeight/2, canvas.width * 0.8, rayHeight);
-         ctx.restore();
-
-         if (config.style !== 'minimal-fast') {
+         if (config.style !== 'minimal-fast' && config.style !== 'none') {
+             // Floating thin ray of light (center-left to center-right)
+             ctx.save();
+             ctx.globalCompositeOperation = 'screen';
+             const rayY = canvas.height * 0.5 + Math.sin(currentTime * 0.7) * (canvas.height * 0.05);
+             const gradient = ctx.createLinearGradient(canvas.width * 0.1, 0, canvas.width * 0.9, 0);
+             gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+             const glowPos = (Math.sin(currentTime * 0.4) + 1) / 2; // moves back and forth 0..1
+             gradient.addColorStop(Math.max(0.01, Math.min(0.99, glowPos)), `rgba(255, 255, 255, ${0.3 + normalizedReactivity * 0.5})`);
+             gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+             
+             ctx.fillStyle = gradient;
+             const rayHeight = Math.max(1, canvas.height * 0.003 + normalizedReactivity * 6);
+             ctx.fillRect(canvas.width * 0.1, rayY - rayHeight/2, canvas.width * 0.8, rayHeight);
+             ctx.restore();
+             
              ctx.save();
              if (config.style === 'chillout') {
                 ctx.fillStyle = `rgba(0, 0, 0, ${0.3 - normalizedReactivity * 0.2})`;
@@ -737,7 +835,7 @@ export async function renderVideoTask(
              }
 
              particles.forEach(p => {
-                p.update(canvas.width, canvas.height, normalizedReactivity);
+                p.update(canvas.width, canvas.height, normalizedReactivity, config.style);
                 p.draw(ctx, normalizedReactivity, config.style);
              });
              

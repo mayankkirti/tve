@@ -7,7 +7,8 @@ export function AudioCropper({
   end,
   duration,
   onChangeStart,
-  onChangeEnd
+  onChangeEnd,
+  onCrop
 }: {
   audioUrl: string;
   start: number;
@@ -15,6 +16,7 @@ export function AudioCropper({
   duration: number;
   onChangeStart: (val: number) => void;
   onChangeEnd: (val: number) => void;
+  onCrop?: (blob: Blob) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -22,6 +24,7 @@ export function AudioCropper({
   const [peaks, setPeaks] = useState<number[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(start);
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
 
   useEffect(() => {
      if (audioRef.current) {
@@ -65,11 +68,13 @@ export function AudioCropper({
         const response = await fetch(audioUrl);
         const arrayBuffer = await response.arrayBuffer();
         const ctx = new window.AudioContext();
-        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
+        ctx.close().catch(() => {});
         
         if (!active) return;
+        setAudioBuffer(decodedBuffer);
 
-        const channelData = audioBuffer.getChannelData(0);
+        const channelData = decodedBuffer.getChannelData(0);
         const samples = 100;
         const blockSize = Math.floor(channelData.length / samples);
         const newPeaks = [];
@@ -173,6 +178,53 @@ export function AudioCropper({
       }
   };
 
+  const cropAudio = () => {
+     if (!audioBuffer || !onCrop) return;
+     const sampleRate = audioBuffer.sampleRate;
+     const numChannels = audioBuffer.numberOfChannels;
+     const startOffset = Math.floor(start * sampleRate);
+     const endOffset = Math.floor(end * sampleRate);
+     const length = Math.max(1, endOffset - startOffset);
+     
+     const bytesPerSample = 2;
+     const blockAlign = numChannels * bytesPerSample;
+     const wav = new ArrayBuffer(44 + length * blockAlign);
+     const view = new DataView(wav);
+     
+     const writeString = (view: DataView, offset: number, string: string) => {
+       for (let i = 0; i < string.length; i++) {
+           view.setUint8(offset + i, string.charCodeAt(i));
+       }
+     };
+     
+     writeString(view, 0, 'RIFF');
+     view.setUint32(4, 36 + length * blockAlign, true);
+     writeString(view, 8, 'WAVE');
+     writeString(view, 12, 'fmt ');
+     view.setUint32(16, 16, true);
+     view.setUint16(20, 1, true); // PCM
+     view.setUint16(22, numChannels, true);
+     view.setUint32(24, sampleRate, true);
+     view.setUint32(28, sampleRate * blockAlign, true);
+     view.setUint16(32, blockAlign, true);
+     view.setUint16(34, 16, true);
+     writeString(view, 36, 'data');
+     view.setUint32(40, length * blockAlign, true);
+     
+     let offset = 44;
+     for (let i = 0; i < length; i++) {
+       for (let channel = 0; channel < numChannels; channel++) {
+           const sample = audioBuffer.getChannelData(channel)[startOffset + i];
+           let s = Math.max(-1, Math.min(1, sample));
+           view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+           offset += 2;
+       }
+     }
+     
+     const blob = new Blob([view], { type: 'audio/wav' });
+     onCrop(blob);
+  };
+
   return (
     <div className="space-y-4">
       <audio ref={audioRef} src={audioUrl} className="hidden" />
@@ -202,13 +254,24 @@ export function AudioCropper({
              }}
              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs transition-colors shadow"
           >
-             {isPlaying ? 'Pause' : 'Play Crop'}
+             {isPlaying ? 'Pause' : 'Play Selection'}
           </button>
-          <div className="flex-1 flex justify-between text-xs text-zinc-400 font-mono">
+          
+          <div className="flex-1 flex justify-center text-xs text-zinc-400 font-mono gap-4">
             <span>{formatAudioTime(start)}</span>
             <span>Dur: {formatAudioTime(end - start)}</span>
             <span>{formatAudioTime(end)}</span>
           </div>
+          
+          {onCrop && (
+          <button
+             type="button"
+             onClick={cropAudio}
+             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs transition-colors shadow"
+          >
+             Crop Audio
+          </button>
+          )}
       </div>
 
       <div className="flex flex-col gap-2">

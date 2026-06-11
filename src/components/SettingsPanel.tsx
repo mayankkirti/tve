@@ -307,6 +307,15 @@ export function SettingsPanel({
                              duration={audioDuration}
                              onChangeStart={(val) => setConfig(prev => ({ ...prev, audioCropStart: val }))}
                              onChangeEnd={(val) => setConfig(prev => ({ ...prev, audioCropEnd: val }))}
+                             onCrop={(blob) => {
+                                setConfig(prev => ({
+                                  ...prev,
+                                  audioUrl: URL.createObjectURL(blob) + '#cropped.wav',
+                                  audioCropEnabled: false,
+                                  audioCropStart: 0,
+                                  audioCropEnd: 0
+                                }));
+                             }}
                           />
                       </div>
                   )}
@@ -441,6 +450,15 @@ export function SettingsPanel({
               <option value="party-flash">Party Flash (Hard Cuts, Glitches)</option>
               <option value="chillout-flash">Chillout Flash (Soft Cuts, Ambient)</option>
               <option value="minimal-fast">Minimal Fast (No FX, Bottom Right Audio)</option>
+              <option value="none">None</option>
+              <option value="classic-orbs">Classic Orbs</option>
+              <option value="soft-bokeh">Soft Bokeh</option>
+              <option value="twinkling-dust">Twinkling Dust</option>
+              <option value="drifting-motes">Drifting Motes</option>
+              <option value="cinematic-light-leaks">Cinematic Light Leaks</option>
+              <option value="falling-snow-ash">Falling Snow/Ash</option>
+              <option value="starfield-hyperdrive">Starfield Hyperdrive</option>
+              <option value="rolling-fog">Rolling Fog</option>
             </select>
           </div>
 
@@ -459,7 +477,7 @@ export function SettingsPanel({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block">BG Slow Cinematic Zoom ({config.bgZoomLevel}%)</label>
+              <label className="block">Bass Reactive Zoom ({config.bgZoomLevel}%)</label>
               <button
                 type="button"
                 onClick={() => setConfig(prev => ({ ...prev, bgZoomEnabled: !prev.bgZoomEnabled }))}

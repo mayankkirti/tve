@@ -196,24 +196,40 @@ export async function startRenderJob(id, config) {
     }
 
     let vizFilter = "";
-    switch (config.style) {
-      case "minimal-fast":
-        vizFilter = `showwaves=s=${config.width}x${Math.floor(config.height * 0.3)}:mode=p2p:colors=white`;
-        break;
-      case "psychedelic":
-        vizFilter = `showcqt=s=${config.width}x${config.height}:bar_h=${Math.floor(config.height * 0.2)}:axis_h=0:sono_g=4:sono_v=10`;
-        break;
-      case "indian-ambient":
-        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=255:gc=255:bc=255:ac=255:rf=5:gf=5:bf=5`;
-        break;
-      case "party-flash":
-        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=210:gc=160:bc=150:ac=255`;
-        break;
-      case "chillout-flash":
-        vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=180:gc=130:bc=130:ac=255:rf=5:gf=10:bf=10`;
-        break;
-      default:
-        vizFilter = `showwaves=s=${config.width}x${config.height}:mode=cline:colors=white`;
+    if (config.style === "none") {
+        vizFilter = "";
+    } else {
+        switch (config.style) {
+          case "minimal-fast":
+            vizFilter = `showwaves=s=${config.width}x${Math.floor(config.height * 0.3)}:mode=p2p:colors=white`;
+            break;
+          case "psychedelic":
+            vizFilter = `showcqt=s=${config.width}x${config.height}:bar_h=${Math.floor(config.height * 0.2)}:axis_h=0:sono_g=4:sono_v=10`;
+            break;
+          case "indian-ambient":
+          case "rolling-fog":
+          case "cinematic-light-leaks":
+            vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=255:gc=255:bc=255:ac=255:rf=5:gf=5:bf=5`;
+            break;
+          case "party-flash":
+            vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=210:gc=160:bc=150:ac=255`;
+            break;
+          case "chillout-flash":
+          case "drifting-motes":
+          case "twinkling-dust":
+            vizFilter = `avectorscope=s=${config.width}x${config.height}:draw=line:zoom=2:rc=180:gc=130:bc=130:ac=255:rf=5:gf=10:bf=10`;
+            break;
+          case "classic-orbs":
+          case "soft-bokeh":
+            vizFilter = `showwaves=s=${config.width}x${config.height}:mode=cline:colors=00ffff|ff00ff|ffff00`;
+            break;
+          case "falling-snow-ash":
+          case "starfield-hyperdrive":
+             vizFilter = `showcqt=s=${config.width}x${config.height}:bar_h=${Math.floor(config.height * 0.2)}:axis_h=0:sono_g=4:sono_v=10`;
+             break;
+          default:
+            vizFilter = `showwaves=s=${config.width}x${config.height}:mode=cline:colors=white`;
+        }
     }
     let filterComplex = "";
     let lastOut = "0:a";
@@ -250,53 +266,170 @@ export async function startRenderJob(id, config) {
           segments.unshift({ start: 0, end: tracks[0].timeSeconds, bgIndex: (K - 1) % K });
         }
       } else if (K > 1) {
-        let durationAvg = 4;
-        if (config.bgMediaStyle === "hard-cut") durationAvg = 2.5;
-        if (config.bgMediaStyle === "soft-crossfade") durationAvg = 6;
-        if (config.bgMediaStyle === "random-crossfade") durationAvg = 5;
         const finalDur = totalSeconds || 180;
-        let t = 0;
+        let cuts = [];
+        
+        // Dynamic Beat Detection for cuts
+        if (["hard-cut", "soft-crossfade", "mix-cuts", "random-crossfade"].includes(config.bgMediaStyle)) {
+             try {
+                const out = execSync(`"${ffmpegInstaller.path}" -v quiet -i "${finalAudioPath}" -filter_complex "aresample=8000,asetnsamples=800,highpass=f=200,lowpass=f=2000,aformat=channel_layouts=mono,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=-" -f null - 2>&1`, {maxBuffer: 1024 * 1024 * 100}).toString();
+                const lines = out.split('\n');
+                const data = [];
+                let currentTime = 0;
+                for (let line of lines) {
+                   line = line.trim();
+                   if (line.startsWith('frame:')) {
+                       const timeMatch = line.match(/pts_time:([0-9.]+)/);
+                       if (timeMatch) currentTime = parseFloat(timeMatch[1]);
+                   } else if (line.startsWith('lavfi.astats.Overall.RMS_level=')) {
+                       const rmsPart = line.split('=')[1];
+                       let rms = parseFloat(rmsPart);
+                       if (rmsPart === '-inf') rms = -100;
+                       data.push({ time: currentTime, energy: Math.pow(10, rms / 20) });
+                   }
+                }
+                
+                let globalSum = 0;
+                for(const d of data) globalSum += d.energy;
+                const globalAvg = data.length > 0 ? globalSum / data.length : 0;
+                
+                // For Mix-cuts, we want to know if local timeframe is "calm" or "aggressive"
+                // Let's store that for the cut builder.
+                
+                let lastCutTime = 0;
+                let minInterval = config.bgMediaStyle === "hard-cut" ? 1.0 : (config.bgMediaStyle === "mix-cuts" ? 1.5 : 4.0);
+                const windowSize = 20; // 2 seconds running window
+                
+                for (let i = 0; i < data.length; i++) {
+                    let localSum = 0;
+                    let localCount = 0;
+                    for (let j = Math.max(0, i - windowSize); j < i; j++) {
+                         localSum += data[j].energy;
+                         localCount++;
+                    }
+                    const localAvg = localCount > 0 ? localSum / localCount : 0;
+                    const d = data[i];
+
+                    if (d.time - lastCutTime >= minInterval) {
+                        const spikeRatio = d.energy > localAvg * 1.3;
+                        const absoluteHigh = d.energy > globalAvg * 0.5;
+                        
+                        // Force a cut if too much time passed
+                        const forceCut = d.time - lastCutTime > (minInterval * 4);
+                        
+                        if ((spikeRatio && absoluteHigh) || forceCut) {
+                            cuts.push({
+                               time: d.time,
+                               isAggressive: localAvg > globalAvg * 1.5 || d.energy > globalAvg * 2.0
+                            });
+                            lastCutTime = d.time;
+                        }
+                    }
+                }
+             } catch(e) {
+                console.error("Audio beat detection failed, falling back to random:", e.message);
+             }
+        }
+        
         let pidx = -1;
-        while (t < finalDur) {
-          let rdur = durationAvg + (Math.random() * 2 - 1);
-          if (config.bgMediaStyle === "mix-cuts") rdur = Math.random() > 0.5 ? 2 : 6;
-          let nidx = Math.floor(Math.random() * K);
-          if (nidx === pidx) nidx = (nidx + 1) % K;
-          segments.push({ start: t, end: t + rdur, bgIndex: nidx });
-          t += rdur;
-          pidx = nidx;
+        if (cuts.length > 0) {
+            let t = 0;
+            for(let i=0; i<cuts.length; i++) {
+                let nidx = Math.floor(Math.random() * K);
+                if (nidx === pidx) nidx = (nidx + 1) % K;
+                const segEnd = cuts[i].time;
+                let isFade = false;
+                
+                if (config.bgMediaStyle === "soft-crossfade" || config.bgMediaStyle === "random-crossfade") {
+                    isFade = true;
+                } else if (config.bgMediaStyle === "mix-cuts") {
+                    isFade = !cuts[i].isAggressive;
+                }
+                
+                segments.push({ start: t, end: segEnd, bgIndex: nidx, isFade });
+                t = segEnd;
+                pidx = nidx;
+            }
+            if (t < finalDur) {
+                let nidx = Math.floor(Math.random() * K);
+                if (nidx === pidx) nidx = (nidx + 1) % K;
+                segments.push({ start: t, end: finalDur, bgIndex: nidx, isFade: false });
+            }
+        } else {
+            // Fallback purely random logic
+            let durationAvg = 4;
+            if (config.bgMediaStyle === "hard-cut") durationAvg = 2.5;
+            if (config.bgMediaStyle === "soft-crossfade") durationAvg = 6;
+            if (config.bgMediaStyle === "random-crossfade") durationAvg = 5;
+            let t = 0;
+            while (t < finalDur) {
+              let rdur = durationAvg + (Math.random() * 2 - 1);
+              if (config.bgMediaStyle === "mix-cuts") rdur = Math.random() > 0.5 ? 2 : 6;
+              let nidx = Math.floor(Math.random() * K);
+              if (nidx === pidx) nidx = (nidx + 1) % K;
+              segments.push({ start: t, end: t + rdur, bgIndex: nidx });
+              t += rdur;
+              pidx = nidx;
+            }
         }
       } else {
         segments.push({ start: 0, end: totalSeconds || 999999, bgIndex: 0 });
       }
-      const usageCount = new Array(numBgInputs).fill(0);
-      for (const seg of segments) usageCount[seg.bgIndex]++;
-      for (let i = 0; i < numBgInputs; i++) {
-        filterComplex += `[${i + 1}]${bgScale},format=yuv420p[scaled_bg_base${i}];`;
-        if (usageCount[i] > 1) {
-           let splits = "";
-           for(let j=0; j<usageCount[i]; j++) splits += `[scaled_bg${i}_${j}]`;
-           filterComplex += `[scaled_bg_base${i}]split=${usageCount[i]}${splits};`;
-        } else if (usageCount[i] === 1) {
-           filterComplex += `[scaled_bg_base${i}]copy[scaled_bg${i}_0];`;
-        } else {
-           filterComplex += `[scaled_bg_base${i}]nullsink;`;
-        }
+      let hasAnyFades = false;
+      if (segments.length <= 200) {
+          for (const seg of segments) {
+             if (seg.isFade !== undefined ? seg.isFade : (config.bgMediaStyle === "tracklist" || config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4)) {
+                hasAnyFades = true;
+             }
+          }
+      } else {
+          // If there are too many segments (e.g. long DJ mix), disable fades to avoid OOM in FFmpeg
+          for (let seg of segments) seg.isFade = false;
       }
-      let sid = 0;
-      const consumed = new Array(numBgInputs).fill(0);
-      for (const seg of segments) {
-        const streamName = `[scaled_bg${seg.bgIndex}_${consumed[seg.bgIndex]++}]`;
-        const nextOut = `[base${sid}]`;
-        const isFade = config.bgMediaStyle === "tracklist" || config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4;
-        if (isFade) {
-          filterComplex += `${streamName}format=yuva420p,fade=t=in:st=${seg.start}:d=1:alpha=1[faded${sid}];`;
-          filterComplex += `${prevBgOut}[faded${sid}]overlay=enable='between(t,${seg.start},${seg.end + 1})'${nextOut};`;
-        } else {
-          filterComplex += `${prevBgOut}${streamName}overlay=enable='between(t,${seg.start},${seg.end})'${nextOut};`;
-        }
-        prevBgOut = nextOut;
-        sid++;
+
+      if (!hasAnyFades) {
+         for (let i = 0; i < numBgInputs; i++) {
+           filterComplex += `[${i + 1}]${bgScale},format=yuv420p[scaled_bg${i}];`;
+         }
+         let sid = 0;
+         for (let i = 0; i < numBgInputs; i++) {
+            const enables = segments.filter(seg => seg.bgIndex === i).map(seg => `between(t,${seg.start},${seg.end})`);
+            if (enables.length > 0) {
+               filterComplex += `${prevBgOut}[scaled_bg${i}]overlay=enable='${enables.join('+')}':eof_action=pass[base${sid}];`;
+               prevBgOut = `[base${sid}]`;
+               sid++;
+            }
+         }
+      } else {
+         const usageCount = new Array(numBgInputs).fill(0);
+         for (const seg of segments) usageCount[seg.bgIndex]++;
+         for (let i = 0; i < numBgInputs; i++) {
+           filterComplex += `[${i + 1}]${bgScale},format=yuv420p[scaled_bg_base${i}];`;
+           if (usageCount[i] > 1) {
+              let splits = "";
+              for(let j=0; j<usageCount[i]; j++) splits += `[scaled_bg${i}_${j}]`;
+              filterComplex += `[scaled_bg_base${i}]split=${usageCount[i]}${splits};`;
+           } else if (usageCount[i] === 1) {
+              filterComplex += `[scaled_bg_base${i}]copy[scaled_bg${i}_0];`;
+           } else {
+              filterComplex += `[scaled_bg_base${i}]nullsink;`;
+           }
+         }
+         let sid = 0;
+         const consumed = new Array(numBgInputs).fill(0);
+         for (const seg of segments) {
+           const streamName = `[scaled_bg${seg.bgIndex}_${consumed[seg.bgIndex]++}]`;
+           const nextOut = `[base${sid}]`;
+           const isFade = seg.isFade !== undefined ? seg.isFade : (config.bgMediaStyle === "tracklist" || config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4);
+           if (isFade) {
+             filterComplex += `${streamName}format=yuva420p,fade=t=in:st=${seg.start}:d=1:alpha=1[faded${sid}];`;
+             filterComplex += `${prevBgOut}[faded${sid}]overlay=enable='between(t,${seg.start},${seg.end + 1})'${nextOut};`;
+           } else {
+             filterComplex += `${prevBgOut}${streamName}overlay=enable='between(t,${seg.start},${seg.end})'${nextOut};`;
+           }
+           prevBgOut = nextOut;
+           sid++;
+         }
       }
       filterComplex += `${prevBgOut}copy[bg];`;
     } else {
@@ -318,7 +451,10 @@ export async function startRenderJob(id, config) {
     filterComplex += `${finalBgOut}format=gbrp[bg_gbrp];`;
     finalBgOut = "[bg_gbrp]";
 
-    let outAudioPads = ['[a_viz]'];
+    let outAudioPads = [];
+    if (vizFilter !== "") {
+       outAudioPads.push('[a_viz]');
+    }
     if (useOlay) outAudioPads.push('[a_mask_smooth_in]');
     if (useBright) {
        if (config.brightnessColorful) {
@@ -330,11 +466,15 @@ export async function startRenderJob(id, config) {
 
     if (outAudioPads.length > 1) {
        filterComplex += `[0:a]asplit=${outAudioPads.length}${outAudioPads.join('')};`;
-    } else {
-       filterComplex += `[0:a]copy[a_viz];`;
+    } else if (outAudioPads.length === 1) {
+       filterComplex += `[0:a]copy${outAudioPads[0]};`;
     }
 
-    filterComplex += `[a_viz]${vizFilter},format=gbrp[viz];`;
+    if (vizFilter !== "") {
+       filterComplex += `[a_viz]${vizFilter},format=gbrp[viz];`;
+    } else {
+       filterComplex += `color=c=black:s=${config.width}x${config.height}:r=${config.fps},format=gbrp[viz];`;
+    }
 
     if (useOlay) {
        filterComplex += `[a_mask_smooth_in]highpass=f=20,lowpass=f=120,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.3,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,colorlevels=rimin=0.4:rimax=0.9:gimin=0.4:gimax=0.9:bimin=0.4:bimax=0.9,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_smooth];`;
