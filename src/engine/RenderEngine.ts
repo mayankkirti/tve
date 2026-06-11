@@ -632,35 +632,60 @@ export async function renderVideoTask(
               const freqSlider = config.brightnessLevel !== undefined ? config.brightnessLevel : 50;
               const thresh = 0.9 - (freqSlider / 100) * 0.7; // 0.2 to 0.9 range
 
-              let flash100 = beatFlash > thresh ? 1.0 : 0.0;
-              let flash50 = beatFlash > thresh * 0.8 ? 0.5 : 0.0;
-              
-              if (flash100 > 0 || flash50 > 0) {
-                  ctx.save();
-                  ctx.globalCompositeOperation = 'screen';
+              const getBandEnergy = (minHz: number, maxHz: number) => {
+                  if (!audioContext) return 0;
+                  const nyquist = audioContext.sampleRate / 2;
+                  const minIdx = Math.floor(minHz / nyquist * bufferLength);
+                  const maxIdx = Math.floor(maxHz / nyquist * bufferLength);
+                  let tempSum = 0;
+                  for(let i=minIdx; i<=maxIdx && i<bufferLength; i++) {
+                      tempSum += dataArray[i];
+                  }
+                  return tempSum / Math.max(1, maxIdx - minIdx + 1) / 255;
+              };
+
+              ctx.save();
+              ctx.globalCompositeOperation = 'color-dodge';
+
+              if (config.brightnessColorful) {
+                  ctx.globalCompositeOperation = 'color-dodge';
+                  const cw = getBandEnergy(40, 80) > thresh;
+                  const cr = getBandEnergy(80, 120) > thresh;
+                  const cg = getBandEnergy(120, 160) > thresh;
+                  const cb = getBandEnergy(160, 220) > thresh;
                   
-                  if (flash100 > 0) {
-                      if (config.brightnessColorful) {
-                          const steps = (1 - thresh) / 4;
-                          if (beatFlash < thresh + steps) {
-                              ctx.fillStyle = `rgba(255, 255, 255, 1.0)`;
-                          } else if (beatFlash < thresh + 2 * steps) {
-                              ctx.fillStyle = `rgba(255, 0, 0, 1.0)`;
-                          } else if (beatFlash < thresh + 3 * steps) {
-                              ctx.fillStyle = `rgba(0, 255, 0, 1.0)`;
-                          } else {
-                              ctx.fillStyle = `rgba(0, 0, 255, 1.0)`;
-                          }
-                      } else {
-                          ctx.fillStyle = `rgba(255, 255, 255, 1.0)`;
-                      }
-                      ctx.fillRect(0, 0, canvas.width, canvas.height);
-                  } else if (flash50 > 0) {
+                  if (cw) {
                       ctx.fillStyle = `rgba(255, 255, 255, 0.5)`;
                       ctx.fillRect(0, 0, canvas.width, canvas.height);
                   }
-                  ctx.restore();
+                  if (cr) {
+                      ctx.fillStyle = `rgba(255, 0, 0, 0.5)`;
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
+                  }
+                  if (cg) {
+                      ctx.fillStyle = `rgba(0, 255, 0, 0.5)`;
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
+                  }
+                  if (cb) {
+                      ctx.fillStyle = `rgba(0, 0, 255, 0.5)`;
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
+                  }
+              } else {
+                  ctx.globalCompositeOperation = 'lighter';
+                  let f100 = getBandEnergy(60, 180) > thresh;
+                  let f50 = getBandEnergy(0, 80) > thresh;
+                  
+                  if (f100) {
+                      ctx.fillStyle = `rgba(255, 255, 255, 0.5)`;
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
+                  }
+                  if (f50) {
+                      ctx.fillStyle = `rgba(255, 255, 255, 0.25)`;
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
+                  }
               }
+              
+              ctx.restore();
          }
 
          // Floating thin ray of light (center-left to center-right)

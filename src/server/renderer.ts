@@ -320,7 +320,13 @@ export async function startRenderJob(id, config) {
 
     let outAudioPads = ['[a_viz]'];
     if (useOlay) outAudioPads.push('[a_mask_smooth_in]');
-    if (useBright) outAudioPads.push('[a_br_100_in]', '[a_br_50_in]');
+    if (useBright) {
+       if (config.brightnessColorful) {
+          outAudioPads.push('[a_cw]', '[a_cr]', '[a_cg]', '[a_cb]');
+       } else {
+          outAudioPads.push('[a_br_100_in]', '[a_br_50_in]');
+       }
+    }
 
     if (outAudioPads.length > 1) {
        filterComplex += `[0:a]asplit=${outAudioPads.length}${outAudioPads.join('')};`;
@@ -351,32 +357,47 @@ export async function startRenderJob(id, config) {
     if (useBright) {
        const freqSlider = config.brightnessLevel !== undefined ? config.brightnessLevel : 50; 
        const clampThresh = Math.max(0.01, Math.min(0.99, 0.9 - (freqSlider / 100) * 0.7)); // 0->0.9, 100->0.2
-       const T_int = Math.round(clampThresh * 255);
-       const step_int = (255 - T_int) / 4;
 
-       // Mask 100% (60Hz to 180Hz)
-       filterComplex += `[a_br_100_in]highpass=f=60,lowpass=f=180,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[mask1_raw];`;
+       const max100 = 0.5; // colordodge to double brightness
+       const max50 = 0.333; // colordodge to 1.5x brightness
        
        if (config.brightnessColorful) {
-          const lut100Str = `lutrgb=r='if(between(val,${T_int},${T_int + 2 * step_int}),255,0)':g='if(between(val,${T_int},${T_int + step_int}),255,if(between(val,${T_int + 2 * step_int},${T_int + 3 * step_int}),255,0))':b='if(between(val,${T_int},${T_int + step_int}),255,if(gte(val,${T_int + 3 * step_int}),255,0))'`;
-          filterComplex += `[mask1_raw]${lut100Str},scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask1];`;
-       } else {
-          filterComplex += `[mask1_raw]colorlevels=rimin=${clampThresh}:rimax=${clampThresh+0.01}:gimin=${clampThresh}:gimax=${clampThresh+0.01}:bimin=${clampThresh}:bimax=${clampThresh+0.01}:romin=0:romax=1.0,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask1];`;
-       }
+          // White
+          filterComplex += `[a_cw]highpass=f=40,lowpass=f=80,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cw_raw];`;
+          filterComplex += `[cw_raw]colorlevels=rimin=${clampThresh}:rimax=${clampThresh+0.01}:gimin=${clampThresh}:gimax=${clampThresh+0.01}:bimin=${clampThresh}:bimax=${clampThresh+0.01}:romin=0:romax=${max100}:gomin=0:gomax=${max100}:bomin=0:bomax=${max100},scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[cw_mask];`;
 
-       // Mask 50% (< 80Hz)
-       filterComplex += `[a_br_50_in]lowpass=f=80,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[mask2_raw];`;
-       if (config.brightnessColorful) {
-          const lut50Str = `lutrgb=r='if(between(val,${T_int},${T_int + 2 * step_int}),128,0)':g='if(between(val,${T_int},${T_int + step_int}),128,if(between(val,${T_int + 2 * step_int},${T_int + 3 * step_int}),128,0))':b='if(between(val,${T_int},${T_int + step_int}),128,if(gte(val,${T_int + 3 * step_int}),128,0))'`;
-          filterComplex += `[mask2_raw]${lut50Str},scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask2];`;
-       } else {
-          filterComplex += `[mask2_raw]colorlevels=rimin=${clampThresh}:rimax=${clampThresh+0.01}:gimin=${clampThresh}:gimax=${clampThresh+0.01}:bimin=${clampThresh}:bimax=${clampThresh+0.01}:romin=0:romax=0.5,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask2];`;
-       }
+          // Red
+          filterComplex += `[a_cr]highpass=f=80,lowpass=f=120,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cr_raw];`;
+          filterComplex += `[cr_raw]colorlevels=rimin=${clampThresh}:rimax=${clampThresh+0.01}:gimin=${clampThresh}:gimax=${clampThresh+0.01}:bimin=${clampThresh}:bimax=${clampThresh+0.01}:romin=0:romax=${max100}:gomin=0:gomax=0:bomin=0:bomax=0,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[cr_mask];`;
 
-       // Screen blending
-       filterComplex += `${finalBgOut}[mask1]blend=all_mode=screen:all_opacity=1.0[bgw_m1];`;
-       filterComplex += `[bgw_m1][mask2]blend=all_mode=screen:all_opacity=1.0[bgw_m2];`;
-       finalBgOut = "[bgw_m2]";
+          // Green
+          filterComplex += `[a_cg]highpass=f=120,lowpass=f=160,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cg_raw];`;
+          filterComplex += `[cg_raw]colorlevels=rimin=${clampThresh}:rimax=${clampThresh+0.01}:gimin=${clampThresh}:gimax=${clampThresh+0.01}:bimin=${clampThresh}:bimax=${clampThresh+0.01}:romin=0:romax=0:gomin=0:gomax=${max100}:bomin=0:bomax=0,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[cg_mask];`;
+
+          // Blue
+          filterComplex += `[a_cb]highpass=f=160,lowpass=f=220,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cb_raw];`;
+          filterComplex += `[cb_raw]colorlevels=rimin=${clampThresh}:rimax=${clampThresh+0.01}:gimin=${clampThresh}:gimax=${clampThresh+0.01}:bimin=${clampThresh}:bimax=${clampThresh+0.01}:romin=0:romax=0:gomin=0:gomax=0:bomin=0:bomax=${max100},scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[cb_mask];`;
+
+          // Combine masks
+          filterComplex += `[cw_mask][cr_mask]blend=all_mode=addition[cwr];[cwr][cg_mask]blend=all_mode=addition[cwrg];[cwrg][cb_mask]blend=all_mode=addition[cwrgb];`;
+          
+          // Apply brightness with colordodge
+          filterComplex += `${finalBgOut}[cwrgb]blend=all_mode=colordodge[bgw_color];`;
+          finalBgOut = "[bgw_color]";
+       } else {
+          // Mask 100% (60Hz to 180Hz)
+          filterComplex += `[a_br_100_in]highpass=f=60,lowpass=f=180,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[mask1_raw];`;
+          filterComplex += `[mask1_raw]colorlevels=rimin=${clampThresh}:rimax=${clampThresh+0.01}:gimin=${clampThresh}:gimax=${clampThresh+0.01}:bimin=${clampThresh}:bimax=${clampThresh+0.01}:romin=0:romax=${max100}:gomin=0:gomax=${max100}:bomin=0:bomax=${max100},scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask1];`;
+
+          // Mask 50% (< 80Hz)
+          filterComplex += `[a_br_50_in]lowpass=f=80,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[mask2_raw];`;
+          filterComplex += `[mask2_raw]colorlevels=rimin=${clampThresh}:rimax=${clampThresh+0.01}:gimin=${clampThresh}:gimax=${clampThresh+0.01}:bimin=${clampThresh}:bimax=${clampThresh+0.01}:romin=0:romax=${max50}:gomin=0:gomax=${max50}:bomin=0:bomax=${max50},scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask2];`;
+
+          // Apply brightness with addition
+          filterComplex += `${finalBgOut}[mask1]blend=all_mode=addition[bgw_m1];`;
+          filterComplex += `[bgw_m1][mask2]blend=all_mode=addition[bgw_m2];`;
+          finalBgOut = "[bgw_m2]";
+       }
     }
     if (config.style === "psychedelic") {
       filterComplex += `${finalBgOut}format=yuv420p,hue=h='t*30',format=gbrp[bg_hue];[bg_hue][viz]blend=all_mode=addition[bgviz];`;
