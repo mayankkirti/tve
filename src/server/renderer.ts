@@ -272,8 +272,10 @@ export async function startRenderJob(id, config) {
         // Dynamic Beat Detection for cuts
         if (["hard-cut", "soft-crossfade", "mix-cuts", "random-crossfade"].includes(config.bgMediaStyle)) {
              try {
-                const out = execSync(`"${ffmpegInstaller.path}" -v quiet -i "${finalAudioPath}" -filter_complex "aresample=8000,asetnsamples=800,highpass=f=200,lowpass=f=2000,aformat=channel_layouts=mono,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=-" -f null - 2>&1`, {maxBuffer: 1024 * 1024 * 100}).toString();
-                const lines = out.split('\n');
+                const astatsLog = path.join(process.cwd(), "uploads", `astats_${id}.txt`);
+                execSync(`"${ffmpegInstaller.path}" -v quiet -i "${finalAudioPath}" -filter_complex "aresample=8000,asetnsamples=800,highpass=f=200,lowpass=f=2000,aformat=channel_layouts=mono,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=${astatsLog}" -f null - 2>&1`);
+                const lines = fs.readFileSync(astatsLog, 'utf-8').split('\n');
+                fs.unlinkSync(astatsLog);
                 const data = [];
                 let currentTime = 0;
                 for (let line of lines) {
@@ -378,12 +380,12 @@ export async function startRenderJob(id, config) {
       let hasAnyFades = false;
       if (segments.length <= 200) {
           for (const seg of segments) {
-             if (seg.isFade !== undefined ? seg.isFade : (config.bgMediaStyle === "tracklist" || config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4)) {
+             if (seg.isFade !== undefined ? seg.isFade : (config.bgMediaStyle === "tracklist" || config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || (config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4))) {
                 hasAnyFades = true;
              }
           }
       } else {
-          // If there are too many segments (e.g. long DJ mix), disable fades to avoid OOM in FFmpeg
+          // If there are too many segments, disable fades to avoid OOM in FFmpeg
           for (let seg of segments) seg.isFade = false;
       }
 
@@ -420,7 +422,7 @@ export async function startRenderJob(id, config) {
          for (const seg of segments) {
            const streamName = `[scaled_bg${seg.bgIndex}_${consumed[seg.bgIndex]++}]`;
            const nextOut = `[base${sid}]`;
-           const isFade = seg.isFade !== undefined ? seg.isFade : (config.bgMediaStyle === "tracklist" || config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4);
+           const isFade = seg.isFade !== undefined ? seg.isFade : (config.bgMediaStyle === "tracklist" || config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || (config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4));
            if (isFade) {
              filterComplex += `${streamName}format=yuva420p,fade=t=in:st=${seg.start}:d=1:alpha=1[faded${sid}];`;
              filterComplex += `${prevBgOut}[faded${sid}]overlay=enable='between(t,${seg.start},${seg.end + 1})'${nextOut};`;
@@ -730,7 +732,14 @@ export async function startRenderJob(id, config) {
     }
 
     filterComplex += `${prevOut}format=yuv420p[outv]`;
-    command = command.complexFilter(filterComplex).outputOptions([
+    
+    // Use disk for the operation instead of memory
+    const filterScriptPath = path.join(process.cwd(), "uploads", `filter_${id}.txt`);
+    fs.writeFileSync(filterScriptPath, filterComplex);
+    
+    command = command.outputOptions([
+      "-filter_complex_script",
+      filterScriptPath,
       "-map",
       "[outv]",
       "-map",
@@ -777,6 +786,8 @@ export async function startRenderJob(id, config) {
       try {
         const tracklistFileCleanup2 = path.join(process.cwd(), `tracklist_${id}.txt`);
         if (fs.existsSync(tracklistFileCleanup2)) fs.unlinkSync(tracklistFileCleanup2);
+        const scriptCleanup = path.join(process.cwd(), "uploads", `filter_${id}.txt`);
+        if (fs.existsSync(scriptCleanup)) fs.unlinkSync(scriptCleanup);
       } catch (e) {
         console.error("Cleanup error", e);
       }
@@ -789,6 +800,8 @@ export async function startRenderJob(id, config) {
       try {
         const tracklistFileCleanup2 = path.join(process.cwd(), `tracklist_${id}.txt`);
         if (fs.existsSync(tracklistFileCleanup2)) fs.unlinkSync(tracklistFileCleanup2);
+        const scriptCleanup = path.join(process.cwd(), "uploads", `filter_${id}.txt`);
+        if (fs.existsSync(scriptCleanup)) fs.unlinkSync(scriptCleanup);
       } catch (e) {
       }
     });
