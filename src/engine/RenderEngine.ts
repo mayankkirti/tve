@@ -448,6 +448,7 @@ export async function renderVideoTask(
       let partyMediaIndex = 0;
       let partyLastCutTime = 0;
       let partyGlitch = false;
+      let rmsHistory: number[] = [];
 
       for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
          if (checkCancelled()) {
@@ -480,14 +481,25 @@ export async function renderVideoTask(
              sum += channelData[i] * channelData[i];
          }
          const rms = Math.sqrt(sum / Math.max(1, endIdx - startIdx));
+         
+         const maxHistoryTokens = Math.max(1, Math.floor(fps * 0.5));
+         rmsHistory.push(rms);
+         if (rmsHistory.length > maxHistoryTokens) rmsHistory.shift();
+         
+         let historySum = 0;
+         for (let i=0; i<rmsHistory.length; i++) historySum += rmsHistory[i];
+         const avgRms = historySum / rmsHistory.length;
+         
          const normalizedReactivity = Math.min(rms * config.reactivity * 15, 1);
+         const beatIntensity = Math.max(0, rms - avgRms * 1.3) / (avgRms + 0.001); // Relative jump over avg
+         const beatFlash = Math.min(1.0, beatIntensity * config.reactivity * 1.5); // 0 to 1
 
          // Draw sequence
          if (bgMedia.length > 0) {
             let imageIndex = 0;
             
             if (config.style === 'party-flash' || config.style === 'chillout-flash') {
-                if (normalizedReactivity > 0.8 && currentTime - partyLastCutTime > 0.2) {
+                if (beatFlash > 0.5 && currentTime - partyLastCutTime > 0.2) {
                    partyMediaIndex = Math.floor(Math.random() * bgMedia.length);
                    partyLastCutTime = currentTime;
                    partyGlitch = Math.random() > 0.5;
@@ -596,24 +608,37 @@ export async function renderVideoTask(
          
          if (config.brightnessEnabled) {
               const bl = config.brightnessLevel !== undefined ? config.brightnessLevel : 50;
-              const audioLight = normalizedReactivity * (bl / 50); // Scale up impact
+              const audioLight = Math.max(0, beatFlash) * (bl / 50) * 1.2; // Only brighten on beats
               currentOverlayAlpha = Math.max(0, currentOverlayAlpha - audioLight);
          }
 
-         ctx.fillStyle = `rgba(0, 0, 0, ${currentOverlayAlpha})`;
-         ctx.fillRect(0, 0, canvas.width, canvas.height);
-         
+         // Psychedelic base hue shift
+         if (config.style === 'psychedelic') {
+              ctx.save();
+              ctx.fillStyle = `rgba(0, 0, 0, ${currentOverlayAlpha})`;
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.globalCompositeOperation = 'color';
+              ctx.fillStyle = `hsl(${(currentTime * 30) % 360}, 100%, 50%)`;
+              ctx.globalAlpha = 0.6;
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.restore();
+         } else {
+             ctx.fillStyle = `rgba(0, 0, 0, ${currentOverlayAlpha})`;
+             ctx.fillRect(0, 0, canvas.width, canvas.height);
+         }
+
          // Strong brightness flash
          if (config.brightnessEnabled && config.style !== 'minimal-fast') {
               const bl = config.brightnessLevel !== undefined ? config.brightnessLevel : 50;
-              let flashAlpha = normalizedReactivity * (bl / 50) * 0.8;
-              flashAlpha = Math.min(1.0, flashAlpha * flashAlpha); // Curve for snappier flashing
+              let flashAlpha = beatFlash; // Use transient spikes
+              if (flashAlpha < 0) flashAlpha = 0;
+              flashAlpha = flashAlpha * (bl / 50);
               
               if (flashAlpha > 0.05) {
                   ctx.save();
                   ctx.globalCompositeOperation = 'screen';
                   if (config.brightnessColorful) {
-                      const hue = Math.floor((currentTime * 120 + normalizedReactivity * 180) % 360);
+                      const hue = Math.floor((currentTime * 120 + beatFlash * 180) % 360);
                       ctx.fillStyle = `hsla(${hue}, 100%, 65%, ${flashAlpha})`;
                   } else {
                       ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
