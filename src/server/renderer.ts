@@ -346,7 +346,7 @@ export async function startRenderJob(id, config) {
     if (needsAudioMask) {
       filterComplex += `[0:a]asplit=2[a_viz][a_mask_in];`;
       filterComplex += `[a_viz]${vizFilter},format=gbrp[viz];`;
-      filterComplex += `[a_mask_in]lowpass=f=150,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0:decays=0.3,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,colorlevels=rimin=0.4:rimax=0.8:gimin=0.4:gimax=0.8:bimin=0.4:bimax=0.8,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_base];`;
+      filterComplex += `[a_mask_in]lowpass=f=150,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0:decays=0.3,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,colorlevels=rimin=0.0:rimax=1.0:gimin=0.0:gimax=1.0:bimin=0.0:bimax=1.0,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_base];`;
       if (useOlay && useBright) {
          filterComplex += `[a_mask_base]split=2[a_mask1][a_mask2];`;
       } else {
@@ -369,7 +369,7 @@ export async function startRenderJob(id, config) {
       
       let brightInput = maskToUse;
       if (config.brightnessColorful) {
-          filterComplex += `color=c=red:s=${config.width}x${config.height}:r=${config.fps},hue=h='t*360',format=gbrp[colorful_base];`;
+          filterComplex += `color=c=red:s=${config.width}x${config.height}:r=${config.fps}:d=${totalSeconds || 99999},format=yuv420p,hue=h='t*60',format=gbrp[colorful_base];`;
           filterComplex += `[colorful_base][${maskToUse}]blend=all_mode=multiply[colorful_mask];`;
           brightInput = 'colorful_mask';
       }
@@ -389,7 +389,7 @@ export async function startRenderJob(id, config) {
       }
     }
     if (config.style === "psychedelic") {
-      filterComplex += `${finalBgOut}hue=h='t*30'[bg_hue];[bg_hue][viz]blend=all_mode=addition[bgviz];`;
+      filterComplex += `${finalBgOut}format=yuv420p,hue=h='t*30',format=gbrp[bg_hue];[bg_hue][viz]blend=all_mode=addition[bgviz];`;
     } else if (config.style === "indian-ambient") {
       filterComplex += `[${gradInputIndex}:v]format=gbrp[grad_gbrp];`;
       filterComplex += `[viz][grad_gbrp]blend=all_mode=multiply[viz_color];`;

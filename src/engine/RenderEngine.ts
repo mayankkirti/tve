@@ -617,9 +617,9 @@ export async function renderVideoTask(
               ctx.save();
               ctx.fillStyle = `rgba(0, 0, 0, ${currentOverlayAlpha})`;
               ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.globalCompositeOperation = 'color';
-              ctx.fillStyle = `hsl(${(currentTime * 30) % 360}, 100%, 50%)`;
-              ctx.globalAlpha = 0.6;
+              ctx.globalCompositeOperation = 'multiply';
+              ctx.fillStyle = `hsl(${(currentTime * 30) % 360}, 100%, 65%)`;
+              ctx.globalAlpha = 1.0;
               ctx.fillRect(0, 0, canvas.width, canvas.height);
               ctx.restore();
          } else {
@@ -638,7 +638,7 @@ export async function renderVideoTask(
                   ctx.save();
                   ctx.globalCompositeOperation = 'screen';
                   if (config.brightnessColorful) {
-                      const hue = Math.floor((currentTime * 120 + beatFlash * 180) % 360);
+                      const hue = Math.floor((currentTime * 60 + beatFlash * 180) % 360);
                       ctx.fillStyle = `hsla(${hue}, 100%, 65%, ${flashAlpha})`;
                   } else {
                       ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
