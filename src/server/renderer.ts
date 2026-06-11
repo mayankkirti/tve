@@ -469,7 +469,7 @@ export async function startRenderJob(id, config) {
     if (outAudioPads.length > 1) {
        filterComplex += `[0:a]asplit=${outAudioPads.length}${outAudioPads.join('')};`;
     } else if (outAudioPads.length === 1) {
-       filterComplex += `[0:a]copy${outAudioPads[0]};`;
+       filterComplex += `[0:a]acopy${outAudioPads[0]};`;
     }
 
     if (vizFilter !== "") {
