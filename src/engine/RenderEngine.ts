@@ -449,6 +449,7 @@ export async function renderVideoTask(
       let partyLastCutTime = 0;
       let partyGlitch = false;
       let rmsHistory: number[] = [];
+      let flashEnv = { cw: 0, cr: 0, cg: 0, cb: 0, f100: 0, f50: 0 };
 
       for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
          if (checkCancelled()) {
@@ -632,6 +633,10 @@ export async function renderVideoTask(
               const freqSlider = config.brightnessLevel !== undefined ? config.brightnessLevel : 50;
               const thresh = 0.9 - (freqSlider / 100) * 0.7; // 0.2 to 0.9 range
 
+              const a = config.flashAttack !== undefined ? config.flashAttack : 0.01;
+              const r = config.flashRelease !== undefined ? config.flashRelease : 0.1;
+              const dt = 1 / fps;
+
               const getBandEnergy = (minHz: number, maxHz: number) => {
                   if (!audioContext) return 0;
                   const nyquist = audioContext.sampleRate / 2;
@@ -644,43 +649,52 @@ export async function renderVideoTask(
                   return tempSum / Math.max(1, maxIdx - minIdx + 1) / 255;
               };
 
+              const stepEnv = (target: number, current: number) => {
+                  if (target > current) {
+                      return current + (target - current) * (1 - Math.exp(-dt / Math.max(0.001, a)));
+                  } else {
+                      return current + (target - current) * (1 - Math.exp(-dt / Math.max(0.001, r)));
+                  }
+              };
+
               ctx.save();
               ctx.globalCompositeOperation = 'color-dodge';
 
               if (config.brightnessColorful) {
-                  ctx.globalCompositeOperation = 'color-dodge';
-                  const cw = getBandEnergy(40, 80) > thresh;
-                  const cr = getBandEnergy(80, 120) > thresh;
-                  const cg = getBandEnergy(120, 160) > thresh;
-                  const cb = getBandEnergy(160, 220) > thresh;
-                  
-                  if (cw) {
-                      ctx.fillStyle = `rgba(255, 255, 255, 0.5)`;
-                      ctx.fillRect(0, 0, canvas.width, canvas.height);
-                  }
-                  if (cr) {
-                      ctx.fillStyle = `rgba(255, 0, 0, 0.5)`;
-                      ctx.fillRect(0, 0, canvas.width, canvas.height);
-                  }
-                  if (cg) {
-                      ctx.fillStyle = `rgba(0, 255, 0, 0.5)`;
-                      ctx.fillRect(0, 0, canvas.width, canvas.height);
-                  }
-                  if (cb) {
-                      ctx.fillStyle = `rgba(0, 0, 255, 0.5)`;
+                  const mapVal = (v: number) => Math.max(0, (v - thresh) / (1 - thresh));
+                  const p = config.flashPeak ?? 0.5;
+
+                  flashEnv.f100 = stepEnv(mapVal(getBandEnergy(60, 180)), flashEnv.f100);
+                  const intensity = flashEnv.f100;
+
+                  if (intensity > 0) {
+                      const v_cw = getBandEnergy(2000, 4000);
+                      const v_cr = getBandEnergy(4000, 6000);
+                      const v_cg = getBandEnergy(6000, 8000);
+                      const v_cb = getBandEnergy(8000, 12000);
+                      
+                      const maxV = Math.max(v_cw, v_cr, v_cg, v_cb, 0.001);
+                      const r = Math.min(255, ((v_cw + v_cr) / maxV) * 255);
+                      const g = Math.min(255, ((v_cw + v_cg) / maxV) * 255);
+                      const b = Math.min(255, ((v_cw + v_cb) / maxV) * 255);
+
+                      ctx.globalCompositeOperation = 'lighter';
+                      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${intensity * p})`;
                       ctx.fillRect(0, 0, canvas.width, canvas.height);
                   }
               } else {
                   ctx.globalCompositeOperation = 'lighter';
-                  let f100 = getBandEnergy(60, 180) > thresh;
-                  let f50 = getBandEnergy(0, 80) > thresh;
+                  const p = config.flashPeak ?? 0.5;
+                  const mapVal = (v: number) => Math.max(0, (v - thresh) / (1 - thresh));
+                  flashEnv.f100 = stepEnv(mapVal(getBandEnergy(60, 180)), flashEnv.f100);
+                  flashEnv.f50 = stepEnv(mapVal(getBandEnergy(0, 80)), flashEnv.f50);
                   
-                  if (f100) {
-                      ctx.fillStyle = `rgba(255, 255, 255, 0.5)`;
+                  if (flashEnv.f100 > 0) {
+                      ctx.fillStyle = `rgba(255, 255, 255, ${flashEnv.f100 * p})`;
                       ctx.fillRect(0, 0, canvas.width, canvas.height);
                   }
-                  if (f50) {
-                      ctx.fillStyle = `rgba(255, 255, 255, 0.25)`;
+                  if (flashEnv.f50 > 0) {
+                      ctx.fillStyle = `rgba(255, 255, 255, ${flashEnv.f50 * p * 0.5})`;
                       ctx.fillRect(0, 0, canvas.width, canvas.height);
                   }
               }

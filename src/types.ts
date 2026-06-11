@@ -39,6 +39,9 @@ export interface VideoConfig {
   brightnessEnabled: boolean;
   brightnessColorful?: boolean;
   brightnessLevel: number; // 15, 20, 24, 30, 60
+  flashAttack?: number;
+  flashRelease?: number;
+  flashPeak?: number;
   channelName: string;
   albumName: string;
   bgMediaStyle?: 'tracklist' | 'random-crossfade' | 'hard-cut' | 'soft-crossfade' | 'mix-cuts';

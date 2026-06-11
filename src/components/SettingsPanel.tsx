@@ -510,6 +510,39 @@ export function SettingsPanel({
               onChange={(e) => setConfig(prev => ({ ...prev, brightnessLevel: parseInt(e.target.value) }))}
               className={`w-full ${!config.brightnessEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             />
+            {config.brightnessEnabled && (
+              <div className="flex flex-col gap-3 mt-3">
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs mb-1">Attack ({config.flashAttack || 0.01}s)</label>
+                    <input 
+                      type="range" min="0.001" max="0.5" step="0.001"
+                      value={config.flashAttack || 0.01}
+                      onChange={(e) => setConfig(prev => ({ ...prev, flashAttack: parseFloat(e.target.value) }))}
+                      className="w-full h-1 accent-white"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs mb-1">Release ({config.flashRelease || 0.1}s)</label>
+                    <input 
+                      type="range" min="0.01" max="2.0" step="0.01"
+                      value={config.flashRelease || 0.1}
+                      onChange={(e) => setConfig(prev => ({ ...prev, flashRelease: parseFloat(e.target.value) }))}
+                      className="w-full h-1 accent-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs mb-1">Peak Brightness ({Math.round((config.flashPeak ?? 0.5) * 100)}%)</label>
+                  <input 
+                    type="range" min="0" max="1" step="0.01"
+                    value={config.flashPeak ?? 0.5}
+                    onChange={(e) => setConfig(prev => ({ ...prev, flashPeak: parseFloat(e.target.value) }))}
+                    className="w-full h-1 accent-white"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           
