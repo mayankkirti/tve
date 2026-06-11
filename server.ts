@@ -185,28 +185,7 @@ app.delete("/api/disk/:filename", (req, res) => {
 // Serve files for preview
 app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-// Cleanup sweep
-setInterval(
-  () => {
-    const now = Date.now();
-    for (const id in jobs) {
-      const job = jobs[id];
-      // Random arbitrary cleanup after 30 minutes
-      if (job.status === "completed" || job.status === "error") {
-        if (job.outputPath && fs.existsSync(job.outputPath)) {
-          const stats = fs.statSync(job.outputPath);
-          if (now - stats.mtimeMs > 30 * 60 * 1000) {
-            fs.unlinkSync(job.outputPath);
-            delete jobs[id];
-          }
-        } else {
-          delete jobs[id];
-        }
-      }
-    }
-  },
-  10 * 60 * 1000,
-);
+// Cleanup sweep (removed to prevent auto deletion)
 
 // Setup directories
 const uploadsDir = path.join(process.cwd(), "uploads");
