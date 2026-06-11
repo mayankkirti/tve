@@ -59,6 +59,10 @@ export default function App() {
           }
        }
     } catch(e) {}
+
+    const handleCloseStorage = () => setCurrentView('studio');
+    window.addEventListener('close-storage', handleCloseStorage);
+    return () => window.removeEventListener('close-storage', handleCloseStorage);
   }, []);
   const [autoUploadYT, setAutoUploadYT] = useState<boolean>(() => {
      return localStorage.getItem('autoUploadYT') !== 'false';

@@ -67,33 +67,8 @@ function checkAndFreeDiskSpace() {
     const limitBytes = systemConfig.diskLimitMB * 1024 * 1024;
     
     if (physicalFreeBytes < requiredBufferBytes || totalUsedByApp > limitBytes) {
-      console.log(`Disk management triggered. Used by app: ${Math.round(totalUsedByApp / 1024 / 1024)}MB. Limit: ${systemConfig.diskLimitMB}MB. Physical Free: ${Math.round(physicalFreeBytes / 1024 / 1024)}MB. Attempting cleanup...`);
-      
-      if (!systemConfig.autoDeleteEnabled) {
-          throw new Error(`Disk limit exceeded (${Math.round(totalUsedByApp / 1024 / 1024)}MB / ${systemConfig.diskLimitMB}MB) and auto-delete is disabled. Please free up space manually.`);
-      }
-      
-      let oldestJobId = null;
-      let oldestTime = Infinity;
-      for (const jid in jobs) {
-        const j = jobs[jid];
-        if (j.status === "completed" && j.outputPath && fs.existsSync(j.outputPath)) {
-          const st = fs.statSync(j.outputPath);
-          const apparentAge = j.uploadedToYouTube ? 0 : st.mtimeMs;
-          if (apparentAge < oldestTime) {
-            oldestTime = apparentAge;
-            oldestJobId = jid;
-          }
-        }
-      }
-      if (oldestJobId) {
-        fs.unlinkSync(jobs[oldestJobId].outputPath);
-        delete jobs[oldestJobId];
-        console.log(`Deleted oldest video to free up space: ${oldestJobId}`);
-        checkAndFreeDiskSpace(); // keep freeing if needed
-      } else {
-        throw new Error("Disk limit exceeded and no completed jobs found to delete for freeing up space.");
-      }
+      console.log(`Disk management triggered. Used by app: ${Math.round(totalUsedByApp / 1024 / 1024)}MB. Limit: ${systemConfig.diskLimitMB}MB. Physical Free: ${Math.round(physicalFreeBytes / 1024 / 1024)}MB.`);
+      throw new Error(`Disk limit exceeded (${Math.round(totalUsedByApp / 1024 / 1024)}MB / ${systemConfig.diskLimitMB}MB). Please free up space manually.`);
     }
 }
 export async function startRenderJob(id, config) {
@@ -343,42 +318,26 @@ export async function startRenderJob(id, config) {
     filterComplex += `${finalBgOut}format=gbrp[bg_gbrp];`;
     finalBgOut = "[bg_gbrp]";
 
-    if (needsAudioMask) {
-      filterComplex += `[0:a]asplit=2[a_viz][a_mask_in];`;
-      filterComplex += `[a_viz]${vizFilter},format=gbrp[viz];`;
-      filterComplex += `[a_mask_in]lowpass=f=150,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0:decays=0.3,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,colorlevels=rimin=0.0:rimax=1.0:gimin=0.0:gimax=1.0:bimin=0.0:bimax=1.0,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_base];`;
-      if (useOlay && useBright) {
-         filterComplex += `[a_mask_base]split=2[a_mask1][a_mask2];`;
-      } else {
-         filterComplex += `[a_mask_base]copy[a_mask1];`;
-      }
+    let outAudioPads = ['[a_viz]'];
+    if (useOlay) outAudioPads.push('[a_mask_smooth_in]');
+    if (useBright) outAudioPads.push('[a_br_100_in]', '[a_br_50_in]');
+
+    if (outAudioPads.length > 1) {
+       filterComplex += `[0:a]asplit=${outAudioPads.length}${outAudioPads.join('')};`;
     } else {
-      filterComplex += `[0:a]${vizFilter},format=gbrp[viz];`;
+       filterComplex += `[0:a]copy[a_viz];`;
     }
-    
+
+    filterComplex += `[a_viz]${vizFilter},format=gbrp[viz];`;
+
     if (useOlay) {
-      filterComplex += `color=c=black:s=${config.width}x${config.height}:r=${config.fps},noise=alls=${overlayNoiseLevel}:allf=t+u,format=gbrp[olay_base];`;
-      filterComplex += `[olay_base][a_mask1]blend=all_mode=multiply[olay_reactive];`;
-      filterComplex += `${finalBgOut}[olay_reactive]blend=all_mode=screen:all_opacity=0.35[bgw_noise];`;
-      finalBgOut = "[bgw_noise]";
+       filterComplex += `[a_mask_smooth_in]highpass=f=20,lowpass=f=120,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.3,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,colorlevels=rimin=0.4:rimax=0.9:gimin=0.4:gimax=0.9:bimin=0.4:bimax=0.9,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_smooth];`;
+       filterComplex += `color=c=black:s=${config.width}x${config.height}:r=${config.fps},noise=alls=${overlayNoiseLevel}:allf=t+u,format=gbrp[olay_base];`;
+       filterComplex += `[olay_base][a_mask_smooth]blend=all_mode=multiply[olay_reactive];`;
+       filterComplex += `${finalBgOut}[olay_reactive]blend=all_mode=screen:all_opacity=0.35[bgw_noise];`;
+       finalBgOut = "[bgw_noise]";
     }
-    
-    if (useBright) {
-      const brIntensity = (config.brightnessLevel || 50) / 100;
-      const maskToUse = (useOlay && useBright) ? 'a_mask2' : 'a_mask1';
-      
-      let brightInput = maskToUse;
-      if (config.brightnessColorful) {
-          filterComplex += `color=c=red:s=${config.width}x${config.height}:r=${config.fps}:d=${totalSeconds || 99999},format=yuv420p,hue=h='t*60',format=gbrp[colorful_base];`;
-          filterComplex += `[colorful_base][${maskToUse}]blend=all_mode=multiply[colorful_mask];`;
-          brightInput = 'colorful_mask';
-      }
-      
-      const safeOpacity = Math.max(0, Math.min(1.0, brIntensity * 1.5));
-      filterComplex += `${finalBgOut}[${brightInput}]blend=all_mode=screen:all_opacity=${safeOpacity}[bgw_bright];`;
-      finalBgOut = "[bgw_bright]";
-    }
-    
+
     // Black Overlay
     if (config.enableBlackOverlay !== false) {
       const opacity = config.overlayOpacity !== undefined ? config.overlayOpacity : 50;
@@ -387,6 +346,37 @@ export async function startRenderJob(id, config) {
         filterComplex += `${finalBgOut}[black_overlay]overlay=format=auto[bgdark];`;
         finalBgOut = "[bgdark]";
       }
+    }
+
+    if (useBright) {
+       const freqSlider = config.brightnessLevel !== undefined ? config.brightnessLevel : 50; 
+       const clampThresh = Math.max(0.01, Math.min(0.99, 0.9 - (freqSlider / 100) * 0.7)); // 0->0.9, 100->0.2
+       const T_int = Math.round(clampThresh * 255);
+       const step_int = (255 - T_int) / 4;
+
+       // Mask 100% (60Hz to 180Hz)
+       filterComplex += `[a_br_100_in]highpass=f=60,lowpass=f=180,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[mask1_raw];`;
+       
+       if (config.brightnessColorful) {
+          const lut100Str = `lutrgb=r='if(between(val,${T_int},${T_int + 2 * step_int}),255,0)':g='if(between(val,${T_int},${T_int + step_int}),255,if(between(val,${T_int + 2 * step_int},${T_int + 3 * step_int}),255,0))':b='if(between(val,${T_int},${T_int + step_int}),255,if(gte(val,${T_int + 3 * step_int}),255,0))'`;
+          filterComplex += `[mask1_raw]${lut100Str},scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask1];`;
+       } else {
+          filterComplex += `[mask1_raw]colorlevels=rimin=${clampThresh}:rimax=${clampThresh+0.01}:gimin=${clampThresh}:gimax=${clampThresh+0.01}:bimin=${clampThresh}:bimax=${clampThresh+0.01}:romin=0:romax=1.0,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask1];`;
+       }
+
+       // Mask 50% (< 80Hz)
+       filterComplex += `[a_br_50_in]lowpass=f=80,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[mask2_raw];`;
+       if (config.brightnessColorful) {
+          const lut50Str = `lutrgb=r='if(between(val,${T_int},${T_int + 2 * step_int}),128,0)':g='if(between(val,${T_int},${T_int + step_int}),128,if(between(val,${T_int + 2 * step_int},${T_int + 3 * step_int}),128,0))':b='if(between(val,${T_int},${T_int + step_int}),128,if(gte(val,${T_int + 3 * step_int}),128,0))'`;
+          filterComplex += `[mask2_raw]${lut50Str},scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask2];`;
+       } else {
+          filterComplex += `[mask2_raw]colorlevels=rimin=${clampThresh}:rimax=${clampThresh+0.01}:gimin=${clampThresh}:gimax=${clampThresh+0.01}:bimin=${clampThresh}:bimax=${clampThresh+0.01}:romin=0:romax=0.5,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask2];`;
+       }
+
+       // Screen blending
+       filterComplex += `${finalBgOut}[mask1]blend=all_mode=screen:all_opacity=1.0[bgw_m1];`;
+       filterComplex += `[bgw_m1][mask2]blend=all_mode=screen:all_opacity=1.0[bgw_m2];`;
+       finalBgOut = "[bgw_m2]";
     }
     if (config.style === "psychedelic") {
       filterComplex += `${finalBgOut}format=yuv420p,hue=h='t*30',format=gbrp[bg_hue];[bg_hue][viz]blend=all_mode=addition[bgviz];`;

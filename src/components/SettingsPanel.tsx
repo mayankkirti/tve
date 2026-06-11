@@ -480,7 +480,7 @@ export function SettingsPanel({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block">Brightness (Audio Reactive) ({config.brightnessLevel}%)</label>
+              <label className="block">Audio Reactive Flashes Frequency ({config.brightnessLevel}%)</label>
               <div className="flex items-center gap-2">
                 {config.brightnessEnabled && (
                   <label className="flex items-center gap-1 text-xs text-zinc-300 cursor-pointer border border-zinc-700 px-2 py-1 rounded bg-zinc-800">

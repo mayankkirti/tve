@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HardDrive, Trash2, Edit2, Play, Download, Settings, RefreshCcw, Youtube } from 'lucide-react';
+import { HardDrive, Trash2, Edit2, Play, Download, Settings, RefreshCcw, Youtube, Grid, List, Link, FileText, Image as ImageIcon, Music, File, X, Copy } from 'lucide-react';
 import { formatTime } from '../lib/utils';
 import { googleSignIn } from '../lib/auth';
 
@@ -8,10 +8,11 @@ export function StorageManager() {
    const [freeBytes, setFreeBytes] = useState(0);
    const [totalBytes, setTotalBytes] = useState(0);
    const [diskLimitMB, setDiskLimitMB] = useState(2048);
-   const [autoDeleteEnabled, setAutoDeleteEnabled] = useState(true);
    const [loading, setLoading] = useState(true);
    const [previewTarget, setPreviewTarget] = useState<string | null>(null);
    const [uploadingFile, setUploadingFile] = useState<string | null>(null);
+   const [viewMode, setViewMode] = useState<'details' | 'icons'>('details');
+   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
    const loadStorage = async () => {
       setLoading(true);
@@ -23,7 +24,6 @@ export function StorageManager() {
             setFreeBytes(data.freeBytes || 0);
             setTotalBytes(data.totalBytes || 1);
             setDiskLimitMB(data.diskLimitMB || 2048);
-            setAutoDeleteEnabled(data.autoDeleteEnabled ?? true);
          }
       } catch(e) {}
       setLoading(false);
@@ -44,16 +44,6 @@ export function StorageManager() {
       loadStorage();
    };
 
-   const toggleAutoDelete = async () => {
-      const newValue = !autoDeleteEnabled;
-      setAutoDeleteEnabled(newValue);
-      await fetch('/api/settings', {
-         method: 'PUT',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ autoDeleteEnabled: newValue })
-      });
-   };
-
    const deleteFile = async (name: string) => {
       if(!confirm(`Delete ${name}?`)) return;
       await fetch(`/api/disk/${name}`, { method: 'DELETE' });
@@ -69,6 +59,13 @@ export function StorageManager() {
          body: JSON.stringify({ oldName, newName })
       });
       loadStorage();
+   };
+
+   const copyLink = (name: string) => {
+      const url = `${window.location.origin}/api/uploads/${name}`;
+      navigator.clipboard.writeText(url);
+      setCopiedLink(name);
+      setTimeout(() => setCopiedLink(null), 2000);
    };
 
    const uploadToYouTube = async (filename: string) => {
@@ -146,138 +143,175 @@ export function StorageManager() {
    const limitBytes = diskLimitMB * 1024 * 1024;
    const usagePercent = Math.min(100, Math.round((usedByAppBytes / limitBytes) * 100));
 
-   if (previewTarget) {
-      return (
-         <div className="absolute inset-0 bg-black z-50 flex flex-col">
-             <div className="p-4 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center">
-                 <h2 className="text-zinc-100 font-medium truncate">{previewTarget}</h2>
-                 <button onClick={() => setPreviewTarget(null)} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-sm transition-colors">Close Preview</button>
-             </div>
-             <div className="flex-1 overflow-hidden p-8 flex items-center justify-center">
-                 <video src={`/api/uploads/${previewTarget}`} controls autoPlay className="max-w-full max-h-full rounded shadow-2xl border border-zinc-800" />
-             </div>
-         </div>
-      );
-   }
+   const getFileIcon = (filename: string, isVideo: boolean) => {
+      if (isVideo || filename.endsWith('.mp4') || filename.endsWith('.webm')) return <Play className="w-8 h-8"/>;
+      if (filename.endsWith('.jpg') || filename.endsWith('.png') || filename.endsWith('.gif') || filename.endsWith('.jpeg')) return <ImageIcon className="w-8 h-8"/>;
+      if (filename.endsWith('.mp3') || filename.endsWith('.wav') || filename.endsWith('.ogg')) return <Music className="w-8 h-8"/>;
+      if (filename.endsWith('.txt') || filename.endsWith('.json')) return <FileText className="w-8 h-8"/>;
+      return <File className="w-8 h-8"/>;
+   };
+
+   const isImage = (f:string) => f.endsWith('.jpg') || f.endsWith('.png') || f.endsWith('.gif') || f.endsWith('.jpeg');
+   const isAudio = (f:string) => f.endsWith('.mp3') || f.endsWith('.wav') || f.endsWith('.ogg');
+   const isVideoFile = (f:string) => f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.mkv');
 
    return (
-      <div className="flex-1 flex flex-col p-8 overflow-y-auto max-w-5xl mx-auto w-full">
-         <div className="flex items-center justify-between mb-8">
-            <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-3"><HardDrive className="text-indigo-400" /> Storage Management</h1>
-            <button onClick={loadStorage} className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors">
-               <RefreshCcw className="w-5 h-5" />
-            </button>
+      <div className="fixed inset-0 z-50 flex flex-col bg-[#1E1E1E] text-white overflow-hidden">
+         <div className="h-10 bg-[#303030] border-b border-[#121212] flex items-center px-4 justify-between select-none shadow-md shrink-0">
+            <div className="flex items-center gap-4">
+               <button onClick={() => {
+                   const closeEvent = new CustomEvent('close-storage');
+                   window.dispatchEvent(closeEvent);
+               }} className="p-1 hover:bg-[#E95420] hover:text-white text-[#AAAAAA] rounded transition-colors" title="Close">
+                  <X className="w-5 h-5" />
+               </button>
+               <span className="font-bold text-sm text-[#DFDFDF]">Storage Manager</span>
+            </div>
+            <div className="flex items-center space-x-4 text-xs font-medium text-[#B0B0B0]">
+               <div className="flex items-center gap-2">
+                  <span className="w-32 bg-[#121212] rounded-full h-2 overflow-hidden shadow-inner">
+                     <div className={`h-full ${usagePercent > 90 ? 'bg-[#E95420]' : 'bg-[#E95420] opacity-80'}`} style={{ width: `${usagePercent}%` }} />
+                  </span>
+                  <span>{Math.round(usedByAppBytes/1024/1024)} MB / {diskLimitMB} MB</span>
+               </div>
+               <button onClick={loadStorage} className="p-1 hover:text-white hover:bg-[#404040] rounded transition-colors" title="Refresh">
+                  <RefreshCcw className="w-4 h-4" />
+               </button>
+            </div>
          </div>
 
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-xl">
-               <div className="flex justify-between items-end mb-4">
-                  <h3 className="text-zinc-400 text-sm font-medium uppercase tracking-wider">Engine Capacity Usage</h3>
-                  <div className="text-2xl font-bold text-white">{Math.round(usedByAppBytes/1024/1024)}<span className="text-sm text-zinc-500 font-normal"> MB</span></div>
-               </div>
-               <div className="w-full bg-zinc-950 rounded-full h-3 mb-2 overflow-hidden border border-zinc-800">
-                  <div className={`h-full ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 70 ? 'bg-yellow-500' : 'bg-indigo-500'} transition-all`} style={{ width: `${usagePercent}%` }} />
-               </div>
-               <div className="flex justify-between text-xs text-zinc-500">
-                  <span>0 MB</span>
-                  <span>Limit: {diskLimitMB} MB</span>
-               </div>
-            </div>
-
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-xl flex flex-col justify-center">
-               <h3 className="text-zinc-400 text-sm font-medium uppercase tracking-wider mb-4 flex items-center gap-2"><Settings className="w-4 h-4" /> Capacity Settings</h3>
+         <div className="flex flex-1 overflow-hidden">
+            <div className="w-56 bg-[#252525] border-r border-[#151515] flex flex-col p-2 space-y-1 shrink-0">
+               <div className="px-3 py-2 text-xs font-semibold text-[#808080] uppercase tracking-wider mt-2 mb-1">Locations</div>
+               <button className="flex items-center gap-3 px-3 py-2 bg-[#E95420] text-white rounded-md transition-colors text-sm font-medium">
+                  <HardDrive className="w-4 h-4" /> App Storage
+               </button>
                
-               <div className="flex items-center gap-4">
-                  <input type="number" min="500" value={diskLimitMB} onChange={e => setDiskLimitMB(Number(e.target.value))} className="w-full bg-zinc-800 border-zinc-700 rounded px-3 py-2 text-white font-bold" />
-                  <span className="text-zinc-400">MB</span>
-                  <button onClick={() => updateLimit(diskLimitMB)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-medium transition-colors whitespace-nowrap">Save</button>
+               <div className="mt-auto p-4 border-t border-[#1a1a1a]">
+                  <div className="flex items-center gap-2 text-xs text-[#808080] mb-2 font-medium">
+                     <Settings className="w-4 h-4"/> Settings
+                  </div>
+                  <div className="text-xs text-[#A0A0A0] flex flex-col gap-2">
+                     <label className="flex flex-col gap-1">
+                        Disk Limit (MB)
+                        <div className="flex items-center gap-2">
+                           <input type="number" min="500" value={diskLimitMB} onChange={e => setDiskLimitMB(Number(e.target.value))} className="w-full bg-[#121212] border border-[#303030] rounded px-2 py-1 text-white focus:outline-none focus:border-[#E95420]" />
+                           <button onClick={() => updateLimit(diskLimitMB)} className="px-2 py-1 bg-[#404040] hover:bg-[#505050] rounded transition-colors text-[#DFDFDF]" title="Save Limit">Save</button>
+                        </div>
+                     </label>
+                  </div>
+               </div>
+            </div>
+
+            <div className="flex-1 flex flex-col bg-[#1E1E1E] overflow-hidden">
+               <div className="flex items-center justify-between p-3 border-b border-[#2C2C2C] bg-[#222222] shrink-0">
+                  <div className="flex items-center gap-2 text-sm text-[#CCCCCC]">
+                     <span className="font-semibold text-white">/</span>
+                     <span>App Storage</span>
+                     <span className="text-[#888888]">({files.length} items)</span>
+                  </div>
+                  <div className="flex items-center bg-[#151515] rounded-md p-1 border border-[#303030]">
+                     <button onClick={() => setViewMode('icons')} className={`p-1.5 rounded-sm ${viewMode === 'icons' ? 'bg-[#3A3A3A] text-white shadow' : 'text-[#888888] hover:text-[#CCCCCC]'} transition-all`} title="Icon View">
+                        <Grid className="w-4 h-4" />
+                     </button>
+                     <button onClick={() => setViewMode('details')} className={`p-1.5 rounded-sm ${viewMode === 'details' ? 'bg-[#3A3A3A] text-white shadow' : 'text-[#888888] hover:text-[#CCCCCC]'} transition-all`} title="List View">
+                        <List className="w-4 h-4" />
+                     </button>
+                  </div>
                </div>
 
-               <div className="flex items-center gap-3 mt-4 pt-4 border-t border-zinc-800">
-                  <span className="text-sm text-zinc-300 font-medium flex-1">Auto Delete Oldest Files</span>
-                  <button 
-                     onClick={toggleAutoDelete}
-                     className={`w-12 h-6 rounded-full relative transition-colors ${autoDeleteEnabled ? 'bg-indigo-500' : 'bg-zinc-700'}`}
-                  >
-                     <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${autoDeleteEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
-                  </button>
-               </div>
-
-               <p className="text-xs text-zinc-500 mt-3 leading-relaxed">
-                  Maximum storage allowed before the engine {autoDeleteEnabled ? 'automatically deletes the oldest completed videos to make space for new render jobs.' : 'stops new render jobs if you exceed the limit.'}
-               </p>
-            </div>
-         </div>
-
-         <div className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl overflow-hidden flex-1 flex flex-col">
-            <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
-               <h3 className="text-zinc-200 font-medium">Disk Contents</h3>
-               <span className="text-xs text-zinc-500 px-2 py-1 bg-zinc-950 rounded-full">{files.length} items</span>
-            </div>
-            {loading ? (
-               <div className="p-8 text-center text-zinc-500 flex-1 flex items-center justify-center">Loading storage info...</div>
-            ) : files.length === 0 ? (
-               <div className="p-8 text-center text-zinc-500 flex-1 flex items-center justify-center">Disk is empty</div>
-            ) : (
-               <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-max">
-                     <thead>
-                        <tr className="text-xs text-zinc-500 uppercase tracking-wider border-b border-zinc-800">
-                           <th className="p-4 font-medium">File Name</th>
-                           <th className="p-4 font-medium w-32">Size</th>
-                           <th className="p-4 font-medium w-48">Date</th>
-                           <th className="p-4 font-medium w-48 text-right">Actions</th>
-                        </tr>
-                     </thead>
-                     <tbody className="divide-y divide-zinc-800/50">
-                        {files.sort((a,b) => b.mtimeMs - a.mtimeMs).map((f) => (
-                           <tr key={f.name} className="hover:bg-zinc-800/30 transition-colors group">
-                              <td className="p-4">
-                                 <div className="flex items-center gap-3">
-                                    {f.isVideo ? (
-                                       <div className="w-10 h-10 bg-indigo-500/10 rounded flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500/20"><Play className="w-5 h-5"/></div>
-                                    ) : (
-                                       <div className="w-10 h-10 bg-zinc-800 rounded flex items-center justify-center text-zinc-500"><HardDrive className="w-5 h-5"/></div>
-                                    )}
-                                    <span className="text-sm font-medium text-zinc-200 max-w-[200px] md:max-w-xs xl:max-w-md truncate" title={f.name}>{f.name}</span>
-                                 </div>
-                              </td>
-                              <td className="p-4 text-sm text-zinc-400">
-                                 {Math.round(f.size/1024/1024 * 100) / 100} MB
-                              </td>
-                              <td className="p-4 text-sm text-zinc-400">
-                                 {new Date(f.mtimeMs).toLocaleString()}
-                              </td>
-                              <td className="p-4">
-                                 <div className="flex items-center justify-end gap-2">
-                                    {f.isVideo && (
-                                       <>
-                                          <button onClick={() => setPreviewTarget(f.name)} className="p-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded transition-colors" title="Preview">
-                                             <Play className="w-4 h-4" />
-                                          </button>
-                                          <button onClick={() => uploadToYouTube(f.name)} disabled={uploadingFile === f.name} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded transition-colors disabled:opacity-50" title="Upload to YouTube">
-                                             {uploadingFile === f.name ? <RefreshCcw className="w-4 h-4 animate-spin"/> : <Youtube className="w-4 h-4" />}
-                                          </button>
-                                          <a href={`/api/uploads/${f.name}`} download={f.name} target="_blank" className="p-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded transition-colors" title="Download">
-                                             <Download className="w-4 h-4" />
-                                          </a>
-                                       </>
-                                    )}
-                                    <button onClick={() => renameFile(f.name)} className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded transition-colors" title="Rename">
-                                       <Edit2 className="w-4 h-4" />
-                                    </button>
-                                    <button onClick={() => deleteFile(f.name)} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded transition-colors" title="Delete">
-                                       <Trash2 className="w-4 h-4" />
-                                    </button>
-                                 </div>
-                              </td>
-                           </tr>
+               <div className="flex-1 overflow-y-auto p-4 relative">
+                  {loading ? (
+                     <div className="h-full flex items-center justify-center text-[#888888]">Loading files...</div>
+                  ) : files.length === 0 ? (
+                     <div className="h-full flex items-center justify-center text-[#888888]">Folder is empty</div>
+                  ) : viewMode === 'icons' ? (
+                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        {files.sort((a,b) => b.mtimeMs - a.mtimeMs).map(f => (
+                           <div key={f.name} className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-[#303030] group cursor-pointer border border-transparent hover:border-[#404040] relative">
+                              <div className="w-16 h-16 bg-[#2A2A2A] rounded-xl shadow border border-[#353535] flex items-center justify-center text-[#E95420] group-hover:scale-105 transition-transform overflow-hidden relative">
+                                  {isImage(f.name) ? <img src={`/api/uploads/${f.name}`} className="w-full h-full object-cover" /> : getFileIcon(f.name, f.isVideo)}
+                              </div>
+                              <span className="text-xs text-center break-words w-full truncate text-[#DDDDDD] group-hover:text-white" title={f.name}>{f.name}</span>
+                              <div className="absolute top-1 right-1 flex-col gap-1 hidden group-hover:flex bg-[#1E1E1E]/90 p-1 rounded-md shadow-lg border border-[#333333] z-10">
+                                 <button onClick={() => setPreviewTarget(f.name)} className="p-1.5 hover:bg-[#E95420] hover:text-white rounded text-[#AAAAAA]" title="Preview"><Play className="w-3 h-3"/></button>
+                                 {(f.isVideo || isVideoFile(f.name)) && <button onClick={() => uploadToYouTube(f.name)} disabled={uploadingFile === f.name} className="p-1.5 hover:bg-red-500 hover:text-white rounded text-[#AAAAAA] disabled:opacity-50" title="Upload to YT">{uploadingFile === f.name ? <RefreshCcw className="w-3 h-3 animate-spin"/> : <Youtube className="w-3 h-3"/>}</button>}
+                                 <a href={`/api/uploads/${f.name}`} download={f.name} target="_blank" className="p-1.5 hover:bg-[#E95420] hover:text-white rounded text-[#AAAAAA] inline-block" title="Download"><Download className="w-3 h-3"/></a>
+                                 <button onClick={() => copyLink(f.name)} className="p-1.5 hover:bg-[#E95420] hover:text-white rounded text-[#AAAAAA]" title="Copy Link">{copiedLink === f.name ? <Copy className="w-3 h-3 text-green-400" /> : <Link className="w-3 h-3" />}</button>
+                                 <button onClick={() => renameFile(f.name)} className="p-1.5 hover:bg-[#E95420] hover:text-white rounded text-[#AAAAAA]" title="Rename"><Edit2 className="w-3 h-3"/></button>
+                                 <button onClick={() => deleteFile(f.name)} className="p-1.5 hover:bg-red-500 hover:text-white rounded text-[#AAAAAA]" title="Delete"><Trash2 className="w-3 h-3"/></button>
+                              </div>
+                           </div>
                         ))}
-                     </tbody>
-                  </table>
+                     </div>
+                  ) : (
+                     <table className="w-full text-left border-collapse min-w-max">
+                        <thead>
+                           <tr className="text-xs text-[#808080] border-b border-[#303030]">
+                              <th className="font-semibold p-2 pb-3 sticky top-0 bg-[#1E1E1E]">Name</th>
+                              <th className="font-semibold p-2 pb-3 w-32 sticky top-0 bg-[#1E1E1E]">Size</th>
+                              <th className="font-semibold p-2 pb-3 w-48 sticky top-0 bg-[#1E1E1E]">Modified</th>
+                              <th className="font-semibold p-2 pb-3 text-right sticky top-0 bg-[#1E1E1E]">Actions</th>
+                           </tr>
+                        </thead>
+                        <tbody>
+                           {files.sort((a,b) => b.mtimeMs - a.mtimeMs).map(f => (
+                              <tr key={f.name} className="border-b border-[#252525] hover:bg-[#2A2A2A] transition-colors group">
+                                 <td className="p-2">
+                                    <div className="flex items-center gap-3">
+                                       <div className="text-[#E95420] w-6 h-6 flex items-center justify-center shrink-0">
+                                          {getFileIcon(f.name, f.isVideo)}
+                                       </div>
+                                       <span className="text-sm font-medium text-[#EAEAEA] truncate max-w-[200px] sm:max-w-xs">{f.name}</span>
+                                    </div>
+                                 </td>
+                                 <td className="p-2 text-sm text-[#AAAAAA] whitespace-nowrap">{(f.size / 1048576).toFixed(2)} MB</td>
+                                 <td className="p-2 text-sm text-[#AAAAAA] whitespace-nowrap">{new Date(f.mtimeMs).toLocaleString()}</td>
+                                 <td className="p-2">
+                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                       <button onClick={() => setPreviewTarget(f.name)} className="p-1.5 hover:bg-[#E95420] hover:text-white rounded text-[#AAAAAA]" title="Preview"><Play className="w-4 h-4"/></button>
+                                       {(f.isVideo || isVideoFile(f.name)) && <button onClick={() => uploadToYouTube(f.name)} disabled={uploadingFile === f.name} className="p-1.5 hover:bg-red-500 hover:text-white rounded text-[#AAAAAA] disabled:opacity-50" title="Upload to YT">{uploadingFile === f.name ? <RefreshCcw className="w-4 h-4 animate-spin"/> : <Youtube className="w-4 h-4"/>}</button>}
+                                       <a href={`/api/uploads/${f.name}`} download={f.name} target="_blank" className="p-1.5 hover:bg-[#E95420] hover:text-white rounded text-[#AAAAAA] block" title="Download"><Download className="w-4 h-4"/></a>
+                                       <button onClick={() => copyLink(f.name)} className="p-1.5 hover:bg-[#E95420] hover:text-white rounded text-[#AAAAAA]" title="Copy Link">{copiedLink === f.name ? <Copy className="w-4 h-4 text-green-400" /> : <Link className="w-4 h-4" />}</button>
+                                       <button onClick={() => renameFile(f.name)} className="p-1.5 hover:bg-[#E95420] hover:text-white rounded text-[#AAAAAA]" title="Rename"><Edit2 className="w-4 h-4"/></button>
+                                       <button onClick={() => deleteFile(f.name)} className="p-1.5 hover:bg-red-500 hover:text-white rounded text-[#AAAAAA]" title="Delete"><Trash2 className="w-4 h-4"/></button>
+                                    </div>
+                                 </td>
+                              </tr>
+                           ))}
+                        </tbody>
+                     </table>
+                  )}
                </div>
-            )}
+            </div>
          </div>
+
+         {previewTarget && (
+            <div className="absolute inset-0 bg-black/90 z-[60] flex flex-col overflow-hidden backdrop-blur-sm">
+               <div className="h-14 bg-[#1E1E1E]/80 border-b border-[#303030] flex items-center px-4 justify-between shrink-0">
+                  <div className="flex items-center gap-3">
+                     <span className="text-white font-medium truncate max-w-lg">{previewTarget}</span>
+                  </div>
+                  <button onClick={() => setPreviewTarget(null)} className="p-2 hover:bg-[#E95420] hover:text-white text-[#AAAAAA] rounded transition-colors"><X className="w-5 h-5"/></button>
+               </div>
+               <div className="flex-1 overflow-hidden p-8 flex items-center justify-center relative">
+                  {(isVideoFile(previewTarget) || files.find(f => f.name === previewTarget)?.isVideo) ? (
+                     <video src={`/api/uploads/${previewTarget}`} controls autoPlay className="max-w-full max-h-full rounded-lg shadow-2xl bg-black" />
+                  ) : isImage(previewTarget) ? (
+                     <img src={`/api/uploads/${previewTarget}`} className="max-w-full max-h-full rounded-lg shadow-2xl object-contain" />
+                  ) : isAudio(previewTarget) ? (
+                     <audio src={`/api/uploads/${previewTarget}`} controls autoPlay className="w-96 shadow-2xl" />
+                  ) : (
+                     <div className="text-center text-[#AAAAAA] flex flex-col items-center">
+                        <FileText className="w-24 h-24 mb-4 text-[#E95420] opacity-80" />
+                        <p className="text-xl">Preview not available for this file type</p>
+                        <a href={`/api/uploads/${previewTarget}`} target="_blank" className="mt-4 px-6 py-2 bg-[#E95420] hover:bg-[#D54A1B] text-white rounded font-medium shadow">Download File</a>
+                     </div>
+                  )}
+               </div>
+            </div>
+         )}
       </div>
    );
 }
+

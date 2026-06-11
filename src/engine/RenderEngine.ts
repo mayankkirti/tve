@@ -629,21 +629,36 @@ export async function renderVideoTask(
 
          // Strong brightness flash
          if (config.brightnessEnabled && config.style !== 'minimal-fast') {
-              const bl = config.brightnessLevel !== undefined ? config.brightnessLevel : 50;
-              let flashAlpha = beatFlash; // Use transient spikes
-              if (flashAlpha < 0) flashAlpha = 0;
-              flashAlpha = flashAlpha * (bl / 50);
+              const freqSlider = config.brightnessLevel !== undefined ? config.brightnessLevel : 50;
+              const thresh = 0.9 - (freqSlider / 100) * 0.7; // 0.2 to 0.9 range
+
+              let flash100 = beatFlash > thresh ? 1.0 : 0.0;
+              let flash50 = beatFlash > thresh * 0.8 ? 0.5 : 0.0;
               
-              if (flashAlpha > 0.05) {
+              if (flash100 > 0 || flash50 > 0) {
                   ctx.save();
                   ctx.globalCompositeOperation = 'screen';
-                  if (config.brightnessColorful) {
-                      const hue = Math.floor((currentTime * 60 + beatFlash * 180) % 360);
-                      ctx.fillStyle = `hsla(${hue}, 100%, 65%, ${flashAlpha})`;
-                  } else {
-                      ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+                  
+                  if (flash100 > 0) {
+                      if (config.brightnessColorful) {
+                          const steps = (1 - thresh) / 4;
+                          if (beatFlash < thresh + steps) {
+                              ctx.fillStyle = `rgba(255, 255, 255, 1.0)`;
+                          } else if (beatFlash < thresh + 2 * steps) {
+                              ctx.fillStyle = `rgba(255, 0, 0, 1.0)`;
+                          } else if (beatFlash < thresh + 3 * steps) {
+                              ctx.fillStyle = `rgba(0, 255, 0, 1.0)`;
+                          } else {
+                              ctx.fillStyle = `rgba(0, 0, 255, 1.0)`;
+                          }
+                      } else {
+                          ctx.fillStyle = `rgba(255, 255, 255, 1.0)`;
+                      }
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
+                  } else if (flash50 > 0) {
+                      ctx.fillStyle = `rgba(255, 255, 255, 0.5)`;
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
                   }
-                  ctx.fillRect(0, 0, canvas.width, canvas.height);
                   ctx.restore();
               }
          }
