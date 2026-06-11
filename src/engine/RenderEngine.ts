@@ -208,6 +208,7 @@ export async function renderVideoTask(
       const audioArrayBuffer = await req.arrayBuffer();
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const audioBuffer = await audioContext.decodeAudioData(audioArrayBuffer);
+      
       let duration = audioBuffer.duration;
       let audioCropStart = 0;
       let audioCropEnd = duration;
@@ -220,7 +221,6 @@ export async function renderVideoTask(
       
       const sampleRate = audioBuffer.sampleRate;
       const channelData = audioBuffer.getChannelData(0);
-
       // 2. Setup Video Elements
       let bgMedia: (HTMLImageElement|HTMLVideoElement)[] = [];
       if (config.backgroundImages && config.backgroundImages.length > 0) {
@@ -613,7 +613,7 @@ export async function renderVideoTask(
                   ctx.save();
                   ctx.globalCompositeOperation = 'screen';
                   if (config.brightnessColorful) {
-                      const hue = Math.floor((currentTime * 1200 + normalizedReactivity * 360) % 360);
+                      const hue = Math.floor((currentTime * 120 + normalizedReactivity * 180) % 360);
                       ctx.fillStyle = `hsla(${hue}, 100%, 65%, ${flashAlpha})`;
                   } else {
                       ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;

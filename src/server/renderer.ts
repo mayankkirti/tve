@@ -346,7 +346,7 @@ export async function startRenderJob(id, config) {
     if (needsAudioMask) {
       filterComplex += `[0:a]asplit=2[a_viz][a_mask_in];`;
       filterComplex += `[a_viz]${vizFilter},format=gbrp[viz];`;
-      filterComplex += `[a_mask_in]aformat=channel_layouts=mono,compand,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,colorlevels=rimin=0.0:rimax=0.1:gimin=0.0:gimax=0.1:bimin=0.0:bimax=0.1,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_base];`;
+      filterComplex += `[a_mask_in]lowpass=f=250,aformat=channel_layouts=mono,compand=attacks=0:decays=0.3,showwaves=s=100x100:mode=p2p:colors=white,boxblur=50:50,colorlevels=rimin=0.1:rimax=0.8:gimin=0.1:gimax=0.8:bimin=0.1:bimax=0.8,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_base];`;
       if (useOlay && useBright) {
          filterComplex += `[a_mask_base]split=2[a_mask1][a_mask2];`;
       } else {
@@ -369,13 +369,13 @@ export async function startRenderJob(id, config) {
       
       let brightInput = maskToUse;
       if (config.brightnessColorful) {
-          filterComplex += `color=c=red:s=${config.width}x${config.height}:r=${config.fps},hue=h='t*1200',format=gbrp[colorful_base];`;
+          filterComplex += `color=c=red:s=${config.width}x${config.height}:r=${config.fps},hue=h='t*360',format=gbrp[colorful_base];`;
           filterComplex += `[colorful_base][${maskToUse}]blend=all_mode=multiply[colorful_mask];`;
           brightInput = 'colorful_mask';
       }
       
       const safeOpacity = Math.max(0, Math.min(1.0, brIntensity * 1.5));
-      filterComplex += `${finalBgOut}[${brightInput}]blend=all_mode=addition:all_opacity=${safeOpacity}[bgw_bright];`;
+      filterComplex += `${finalBgOut}[${brightInput}]blend=all_mode=screen:all_opacity=${safeOpacity}[bgw_bright];`;
       finalBgOut = "[bgw_bright]";
     }
     
