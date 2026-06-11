@@ -346,7 +346,7 @@ export async function startRenderJob(id, config) {
     if (needsAudioMask) {
       filterComplex += `[0:a]asplit=2[a_viz][a_mask_in];`;
       filterComplex += `[a_viz]${vizFilter},format=gbrp[viz];`;
-      filterComplex += `[a_mask_in]lowpass=f=250,aformat=channel_layouts=mono,compand=attacks=0:decays=0.3,showwaves=s=100x100:mode=p2p:colors=white,boxblur=50:50,colorlevels=rimin=0.1:rimax=0.8:gimin=0.1:gimax=0.8:bimin=0.1:bimax=0.8,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_base];`;
+      filterComplex += `[a_mask_in]lowpass=f=250,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0:decays=0.3,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,colorlevels=rimin=0.0:rimax=0.15:gimin=0.0:gimax=0.15:bimin=0.0:bimax=0.15,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_base];`;
       if (useOlay && useBright) {
          filterComplex += `[a_mask_base]split=2[a_mask1][a_mask2];`;
       } else {
