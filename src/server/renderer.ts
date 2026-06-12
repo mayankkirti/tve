@@ -378,7 +378,7 @@ export async function startRenderJob(id, config) {
         segments.push({ start: 0, end: totalSeconds || 999999, bgIndex: 0 });
       }
       let hasAnyFades = false;
-      if (segments.length <= 200) {
+      if (segments.length <= 40) {
           for (const seg of segments) {
              if (seg.isFade !== undefined ? seg.isFade : (config.bgMediaStyle === "tracklist" || config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || (config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4))) {
                 hasAnyFades = true;
@@ -391,15 +391,33 @@ export async function startRenderJob(id, config) {
 
       if (!hasAnyFades) {
          for (let i = 0; i < numBgInputs; i++) {
-           filterComplex += `[${i + 1}]${bgScale},format=yuv420p[scaled_bg${i}];`;
+           filterComplex += `[${i + 1}]${bgScale},format=yuv420p[scaled_bg_base${i}];`;
          }
+         
+         const CHUNK_SIZE = 20;
          let sid = 0;
          for (let i = 0; i < numBgInputs; i++) {
             const enables = segments.filter(seg => seg.bgIndex === i).map(seg => `between(t,${seg.start},${seg.end})`);
             if (enables.length > 0) {
-               filterComplex += `${prevBgOut}[scaled_bg${i}]overlay=enable='${enables.join('+')}':eof_action=pass[base${sid}];`;
-               prevBgOut = `[base${sid}]`;
-               sid++;
+               const numChunks = Math.ceil(enables.length / CHUNK_SIZE);
+               if (numChunks > 1) {
+                  let splits = "";
+                  for(let j=0; j<numChunks; j++) splits += `[scaled_bg${i}_${j}]`;
+                  filterComplex += `[scaled_bg_base${i}]split=${numChunks}${splits};`;
+               } else {
+                  filterComplex += `[scaled_bg_base${i}]copy[scaled_bg${i}_0];`;
+               }
+               
+               for (let c = 0; c < numChunks; c++) {
+                  const chunk = enables.slice(c * CHUNK_SIZE, (c + 1) * CHUNK_SIZE);
+                  if (chunk.length > 0) {
+                     filterComplex += `${prevBgOut}[scaled_bg${i}_${c}]overlay=enable='${chunk.join('+')}':eof_action=pass[base${sid}];`;
+                     prevBgOut = `[base${sid}]`;
+                     sid++;
+                  }
+               }
+            } else {
+               filterComplex += `[scaled_bg_base${i}]nullsink;`;
             }
          }
       } else {
@@ -469,7 +487,7 @@ export async function startRenderJob(id, config) {
     if (outAudioPads.length > 1) {
        filterComplex += `[0:a]asplit=${outAudioPads.length}${outAudioPads.join('')};`;
     } else if (outAudioPads.length === 1) {
-       filterComplex += `[0:a]acopy${outAudioPads[0]};`;
+       filterComplex += `[0:a]anull${outAudioPads[0]};`;
     }
 
     if (vizFilter !== "") {
