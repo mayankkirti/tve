@@ -649,7 +649,7 @@ export async function startRenderJob(id, config) {
     const tracklistFileCleanup = path.join(process.cwd(), `tracklist_${id}.txt`);
     const addTextOptions = [];
     const baseTextSize = (config.textSize || 100) / 100;
-    const escapeText = (t) => t.replace(/'/g, "\\'").replace(/:/g, "\\:");
+    const escapeText = (t) => t.replace(/\\/g, '\\\\').replace(/'/g, '’').replace(/:/g, '\\:').replace(/%/g, '%%');
     const h = config.height || 1080;
     const songFS = Math.floor(h * 0.06 * baseTextSize);
     const artistFS = Math.floor(h * 0.035 * baseTextSize);
@@ -657,7 +657,7 @@ export async function startRenderJob(id, config) {
     const channelFS = Math.floor(h * 0.045 * baseTextSize);
     if (config.channelName) {
       const yVal = 25 + Math.floor(120 * ((config.logoSize || 100) / 100)) / 2;
-      addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.channelName) + "':fontcolor=white:fontsize=" + channelFS + ":x=50:y=" + yVal + "-th/2");
+      addTextOptions.push("drawtext=fontfile=" + fontPath + ":text='" + escapeText(config.channelName) + "':fontcolor=white:fontsize=" + channelFS + ":x=50:y=" + yVal + "-th/2");
     }
     let tracksGlobal = [];
     if (config.tracklistRaw) {
@@ -727,12 +727,12 @@ export async function startRenderJob(id, config) {
         const trk = tracksGlobal[i];
         const endT = tracksGlobal[i+1] ? tracksGlobal[i+1].timeSec : 999999;
         const enable = "enable='between(t," + trk.timeSec + "," + endT + ")':";
-        if(trk.songName) addTextOptions.push("drawtext=" + enable + "fontfile='" + fontPathBold + "':text='" + escapeText(trk.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
-        if(trk.artistName) addTextOptions.push("drawtext=" + enable + "fontfile='" + fontPath + "':text='" + escapeText(trk.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
+        if(trk.songName) addTextOptions.push("drawtext=" + enable + "fontfile=" + fontPathBold + ":text='" + escapeText(trk.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
+        if(trk.artistName) addTextOptions.push("drawtext=" + enable + "fontfile=" + fontPath + ":text='" + escapeText(trk.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
       }
     } else {
-      if (config.songName) addTextOptions.push("drawtext=fontfile='" + fontPathBold + "':text='" + escapeText(config.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
-      if (config.artistName) addTextOptions.push("drawtext=fontfile='" + fontPath + "':text='" + escapeText(config.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
+      if (config.songName) addTextOptions.push("drawtext=fontfile=" + fontPathBold + ":text='" + escapeText(config.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
+      if (config.artistName) addTextOptions.push("drawtext=fontfile=" + fontPath + ":text='" + escapeText(config.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
     }
 
     addTextOptions.forEach((drawtextStr) => {
