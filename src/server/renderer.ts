@@ -74,6 +74,7 @@ function checkAndFreeDiskSpace() {
 export async function startRenderJob(id, config) {
   jobs[id] = { id, progress: 0, status: "rendering", config, createdAt: Date.now() };
   const outputPath = path.join(process.cwd(), "uploads", `${id}.mp4`);
+  let textFilePaths = [];
   try {
     checkAndFreeDiskSpace();
     await checkBackpressure();
@@ -273,7 +274,7 @@ export async function startRenderJob(id, config) {
         if (["hard-cut", "soft-crossfade", "mix-cuts", "random-crossfade"].includes(config.bgMediaStyle)) {
              try {
                 const astatsLog = path.join(process.cwd(), "uploads", `astats_${id}.txt`);
-                execSync(`"${ffmpegInstaller.path}" -v quiet -i "${finalAudioPath}" -filter_complex "aresample=8000,asetnsamples=800,highpass=f=200,lowpass=f=2000,pan=1c|c0=0.5*c0+0.5*c1,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=${astatsLog}" -f null - 2>&1`);
+                execSync(`"${ffmpegInstaller.path}" -v quiet -i "${finalAudioPath}" -filter_complex "aresample=8000,asetnsamples=800,highpass=f=200,lowpass=f=2000,aformat=channel_layouts=mono,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=${astatsLog}" -f null - 2>&1`);
                 const lines = fs.readFileSync(astatsLog, 'utf-8').split('\n');
                 fs.unlinkSync(astatsLog);
                 const data = [];
@@ -378,7 +379,7 @@ export async function startRenderJob(id, config) {
         segments.push({ start: 0, end: totalSeconds || 999999, bgIndex: 0 });
       }
       let hasAnyFades = false;
-      if (segments.length <= 40) {
+      if (segments.length <= 200) {
           for (const seg of segments) {
              if (seg.isFade !== undefined ? seg.isFade : (config.bgMediaStyle === "tracklist" || config.bgMediaStyle === "random-crossfade" || config.bgMediaStyle === "soft-crossfade" || (config.bgMediaStyle === "mix-cuts" && seg.end - seg.start > 4))) {
                 hasAnyFades = true;
@@ -391,33 +392,15 @@ export async function startRenderJob(id, config) {
 
       if (!hasAnyFades) {
          for (let i = 0; i < numBgInputs; i++) {
-           filterComplex += `[${i + 1}]${bgScale},format=yuv420p[scaled_bg_base${i}];`;
+           filterComplex += `[${i + 1}]${bgScale},format=yuv420p[scaled_bg${i}];`;
          }
-         
-         const CHUNK_SIZE = 20;
          let sid = 0;
          for (let i = 0; i < numBgInputs; i++) {
             const enables = segments.filter(seg => seg.bgIndex === i).map(seg => `between(t,${seg.start},${seg.end})`);
             if (enables.length > 0) {
-               const numChunks = Math.ceil(enables.length / CHUNK_SIZE);
-               if (numChunks > 1) {
-                  let splits = "";
-                  for(let j=0; j<numChunks; j++) splits += `[scaled_bg${i}_${j}]`;
-                  filterComplex += `[scaled_bg_base${i}]split=${numChunks}${splits};`;
-               } else {
-                  filterComplex += `[scaled_bg_base${i}]copy[scaled_bg${i}_0];`;
-               }
-               
-               for (let c = 0; c < numChunks; c++) {
-                  const chunk = enables.slice(c * CHUNK_SIZE, (c + 1) * CHUNK_SIZE);
-                  if (chunk.length > 0) {
-                     filterComplex += `${prevBgOut}[scaled_bg${i}_${c}]overlay=enable='${chunk.join('+')}':eof_action=pass[base${sid}];`;
-                     prevBgOut = `[base${sid}]`;
-                     sid++;
-                  }
-               }
-            } else {
-               filterComplex += `[scaled_bg_base${i}]nullsink;`;
+               filterComplex += `${prevBgOut}[scaled_bg${i}]overlay=enable='${enables.join('+')}':eof_action=pass[base${sid}];`;
+               prevBgOut = `[base${sid}]`;
+               sid++;
             }
          }
       } else {
@@ -463,7 +446,7 @@ export async function startRenderJob(id, config) {
     if (config.overlayEffect === 'VHS Glitch') overlayNoiseLevel = 100;
 
     let useOlay = !config.bypassOverlayFX && config.overlayEffect && config.overlayEffect !== "None";
-    let useBright = !config.bypassOverlayFX && config.brightnessEnabled;
+    let useBright = config.brightnessEnabled;
 
     let needsAudioMask = useOlay || useBright;
     
@@ -487,7 +470,7 @@ export async function startRenderJob(id, config) {
     if (outAudioPads.length > 1) {
        filterComplex += `[0:a]asplit=${outAudioPads.length}${outAudioPads.join('')};`;
     } else if (outAudioPads.length === 1) {
-       filterComplex += `[0:a]anull${outAudioPads[0]};`;
+       filterComplex += `[0:a]acopy${outAudioPads[0]};`;
     }
 
     if (vizFilter !== "") {
@@ -497,7 +480,7 @@ export async function startRenderJob(id, config) {
     }
 
     if (useOlay) {
-       filterComplex += `[a_mask_smooth_in]highpass=f=20,lowpass=f=120,volume=3.0,pan=1c|c0=0.5*c0+0.5*c1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,colorlevels=rimin=0.4:rimax=0.9:gimin=0.4:gimax=0.9:bimin=0.4:bimax=0.9,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_smooth];`;
+       filterComplex += `[a_mask_smooth_in]highpass=f=20,lowpass=f=120,volume=3.0,aformat=channel_layouts=mono,compand=attacks=0.01:decays=0.3,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,colorlevels=rimin=0.4:rimax=0.9:gimin=0.4:gimax=0.9:bimin=0.4:bimax=0.9,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[a_mask_smooth];`;
        filterComplex += `color=c=black:s=${config.width}x${config.height}:r=${config.fps},noise=alls=${overlayNoiseLevel}:allf=t+u,format=gbrp[olay_base];`;
        filterComplex += `[olay_base][a_mask_smooth]blend=all_mode=multiply[olay_reactive];`;
        filterComplex += `${finalBgOut}[olay_reactive]blend=all_mode=screen:all_opacity=0.35[bgw_noise];`;
@@ -519,33 +502,33 @@ export async function startRenderJob(id, config) {
        const clampThresh = Math.max(0.01, Math.min(0.99, 0.9 - (freqSlider / 100) * 0.7)); // 0->0.9, 100->0.2
 
        const p = config.flashPeak ?? 0.5;
-       const max100 = Math.max(0.01, p); // parameter mapping to colorlevels maximum
-       const max50 = Math.max(0.01, p * 0.66); // scaled max
+       const max100 = p; // parameter mapping to colorlevels maximum
+       const max50 = p * 0.66; // scaled max
        
        if (config.brightnessColorful) {
           const a = config.flashAttack || 0.01;
           const r = config.flashRelease || 0.1;
           // White
-          filterComplex += `[a_cw]highpass=f=2000,lowpass=f=4000,volume=8.0,pan=1c|c0=0.5*c0+0.5*c1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cw_raw];`;
+          filterComplex += `[a_cw]highpass=f=2000,lowpass=f=4000,volume=8.0,aformat=channel_layouts=mono,compand=attacks=${a}:decays=${r},showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cw_raw];`;
           filterComplex += `[cw_raw]colorlevels=rimin=0:rimax=1.0:gimin=0:gimax=1.0:bimin=0:bimax=1.0:romin=0:romax=1.0:gomin=0:gomax=1.0:bomin=0:bomax=1.0,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[cw_mask];`;
 
           // Red
-          filterComplex += `[a_cr]highpass=f=4000,lowpass=f=6000,volume=8.0,pan=1c|c0=0.5*c0+0.5*c1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cr_raw];`;
+          filterComplex += `[a_cr]highpass=f=4000,lowpass=f=6000,volume=8.0,aformat=channel_layouts=mono,compand=attacks=${a}:decays=${r},showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cr_raw];`;
           filterComplex += `[cr_raw]colorlevels=rimin=0:rimax=1.0:gimin=0:gimax=1.0:bimin=0:bimax=1.0:romin=0:romax=1.0:gomin=0:gomax=0:bomin=0:bomax=0,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[cr_mask];`;
 
           // Green
-          filterComplex += `[a_cg]highpass=f=6000,lowpass=f=8000,volume=8.0,pan=1c|c0=0.5*c0+0.5*c1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cg_raw];`;
+          filterComplex += `[a_cg]highpass=f=6000,lowpass=f=8000,volume=8.0,aformat=channel_layouts=mono,compand=attacks=${a}:decays=${r},showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cg_raw];`;
           filterComplex += `[cg_raw]colorlevels=rimin=0:rimax=1.0:gimin=0:gimax=1.0:bimin=0:bimax=1.0:romin=0:romax=0:gomin=0:gomax=1.0:bomin=0:bomax=0,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[cg_mask];`;
 
           // Blue
-          filterComplex += `[a_cb]highpass=f=8000,lowpass=f=12000,volume=8.0,pan=1c|c0=0.5*c0+0.5*c1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cb_raw];`;
+          filterComplex += `[a_cb]highpass=f=8000,lowpass=f=12000,volume=8.0,aformat=channel_layouts=mono,compand=attacks=${a}:decays=${r},showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[cb_raw];`;
           filterComplex += `[cb_raw]colorlevels=rimin=0:rimax=1.0:gimin=0:gimax=1.0:bimin=0:bimax=1.0:romin=0:romax=0:gomin=0:gomax=0:bomin=0:bomax=1.0,scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[cb_mask];`;
 
           // Combine masks
           filterComplex += `[cw_mask][cr_mask]blend=all_mode=addition[cwr];[cwr][cg_mask]blend=all_mode=addition[cwrg];[cwrg][cb_mask]blend=all_mode=addition[treble_rgb];`;
           
           // Bass Mask
-          filterComplex += `[a_bass]highpass=f=60,lowpass=f=180,volume=3.0,pan=1c|c0=0.5*c0+0.5*c1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[bass_raw];`;
+          filterComplex += `[a_bass]highpass=f=60,lowpass=f=180,volume=3.0,aformat=channel_layouts=mono,compand=attacks=${a}:decays=${r},showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[bass_raw];`;
           filterComplex += `[bass_raw]colorlevels=rimin=${clampThresh}:rimax=1.0:gimin=${clampThresh}:gimax=1.0:bimin=${clampThresh}:bimax=1.0:romin=0:romax=${max100}:gomin=0:gomax=${max100}:bomin=0:bomax=${max100},scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[bass_mask];`;
 
           // Apply brightness mapping and addition
@@ -556,11 +539,11 @@ export async function startRenderJob(id, config) {
           const a = config.flashAttack || 0.01;
           const r = config.flashRelease || 0.1;
           // Mask 100% (60Hz to 180Hz)
-          filterComplex += `[a_br_100_in]highpass=f=60,lowpass=f=180,volume=3.0,pan=1c|c0=0.5*c0+0.5*c1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[mask1_raw];`;
+          filterComplex += `[a_br_100_in]highpass=f=60,lowpass=f=180,volume=3.0,aformat=channel_layouts=mono,compand=attacks=${a}:decays=${r},showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[mask1_raw];`;
           filterComplex += `[mask1_raw]colorlevels=rimin=${clampThresh}:rimax=1.0:gimin=${clampThresh}:gimax=1.0:bimin=${clampThresh}:bimax=1.0:romin=0:romax=${max100}:gomin=0:gomax=${max100}:bomin=0:bomax=${max100},scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask1];`;
 
           // Mask 50% (< 80Hz)
-          filterComplex += `[a_br_50_in]lowpass=f=80,volume=3.0,pan=1c|c0=0.5*c0+0.5*c1,showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[mask2_raw];`;
+          filterComplex += `[a_br_50_in]lowpass=f=80,volume=3.0,aformat=channel_layouts=mono,compand=attacks=${a}:decays=${r},showwaves=s=16x16:mode=cline:colors=white,boxblur=4:4,format=rgb24[mask2_raw];`;
           filterComplex += `[mask2_raw]colorlevels=rimin=${clampThresh}:rimax=1.0:gimin=${clampThresh}:gimax=1.0:bimin=${clampThresh}:bimax=1.0:romin=0:romax=${max50}:gomin=0:gomax=${max50}:bomin=0:bomax=${max50},scale=${config.width}x${config.height}:flags=bicubic,format=gbrp[mask2];`;
 
           // Apply brightness with addition
@@ -648,8 +631,13 @@ export async function startRenderJob(id, config) {
     let filterIndex = 1;
     const tracklistFileCleanup = path.join(process.cwd(), `tracklist_${id}.txt`);
     const addTextOptions = [];
+    const writeTextFile = (t) => {
+       const p = path.join(process.cwd(), "uploads", `tf_${id}_${textFilePaths.length}.txt`).replace(/\\/g, '/');
+       fs.writeFileSync(p, t);
+       textFilePaths.push(p);
+       return p;
+    };
     const baseTextSize = (config.textSize || 100) / 100;
-    const escapeText = (t) => t.replace(/\\/g, '\\\\').replace(/'/g, '’').replace(/:/g, '\\:').replace(/%/g, '%%');
     const h = config.height || 1080;
     const songFS = Math.floor(h * 0.06 * baseTextSize);
     const artistFS = Math.floor(h * 0.035 * baseTextSize);
@@ -657,7 +645,7 @@ export async function startRenderJob(id, config) {
     const channelFS = Math.floor(h * 0.045 * baseTextSize);
     if (config.channelName) {
       const yVal = 25 + Math.floor(120 * ((config.logoSize || 100) / 100)) / 2;
-      addTextOptions.push("drawtext=fontfile=" + fontPath + ":text='" + escapeText(config.channelName) + "':fontcolor=white:fontsize=" + channelFS + ":x=50:y=" + yVal + "-th/2");
+      addTextOptions.push("drawtext=fontfile='" + fontPath + "':textfile='" + writeTextFile(config.channelName) + "':fontcolor=white:fontsize=" + channelFS + ":x=50:y=" + yVal + "-th/2");
     }
     let tracksGlobal = [];
     if (config.tracklistRaw) {
@@ -727,12 +715,12 @@ export async function startRenderJob(id, config) {
         const trk = tracksGlobal[i];
         const endT = tracksGlobal[i+1] ? tracksGlobal[i+1].timeSec : 999999;
         const enable = "enable='between(t," + trk.timeSec + "," + endT + ")':";
-        if(trk.songName) addTextOptions.push("drawtext=" + enable + "fontfile=" + fontPathBold + ":text='" + escapeText(trk.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
-        if(trk.artistName) addTextOptions.push("drawtext=" + enable + "fontfile=" + fontPath + ":text='" + escapeText(trk.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
+        if(trk.songName) addTextOptions.push("drawtext=" + enable + "fontfile='" + fontPathBold + "':textfile='" + writeTextFile(trk.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
+        if(trk.artistName) addTextOptions.push("drawtext=" + enable + "fontfile='" + fontPath + "':textfile='" + writeTextFile(trk.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
       }
     } else {
-      if (config.songName) addTextOptions.push("drawtext=fontfile=" + fontPathBold + ":text='" + escapeText(config.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
-      if (config.artistName) addTextOptions.push("drawtext=fontfile=" + fontPath + ":text='" + escapeText(config.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
+      if (config.songName) addTextOptions.push("drawtext=fontfile='" + fontPathBold + "':textfile='" + writeTextFile(config.songName) + "':fontcolor=white:fontsize=" + songFS + ":x=50:y=" + songY);
+      if (config.artistName) addTextOptions.push("drawtext=fontfile='" + fontPath + "':textfile='" + writeTextFile(config.artistName) + "':fontcolor=white:fontsize=" + artistFS + ":x=50:y=" + artistY);
     }
 
     addTextOptions.forEach((drawtextStr) => {
@@ -806,6 +794,9 @@ export async function startRenderJob(id, config) {
         if (fs.existsSync(tracklistFileCleanup2)) fs.unlinkSync(tracklistFileCleanup2);
         const scriptCleanup = path.join(process.cwd(), "uploads", `filter_${id}.txt`);
         if (fs.existsSync(scriptCleanup)) fs.unlinkSync(scriptCleanup);
+        for (const tf of textFilePaths) {
+           if (fs.existsSync(tf)) fs.unlinkSync(tf);
+        }
       } catch (e) {
         console.error("Cleanup error", e);
       }
@@ -820,6 +811,9 @@ export async function startRenderJob(id, config) {
         if (fs.existsSync(tracklistFileCleanup2)) fs.unlinkSync(tracklistFileCleanup2);
         const scriptCleanup = path.join(process.cwd(), "uploads", `filter_${id}.txt`);
         if (fs.existsSync(scriptCleanup)) fs.unlinkSync(scriptCleanup);
+        for (const tf of textFilePaths) {
+           if (fs.existsSync(tf)) fs.unlinkSync(tf);
+        }
       } catch (e) {
       }
     });
@@ -829,5 +823,8 @@ export async function startRenderJob(id, config) {
     if (activeRenderThreads > 0) activeRenderThreads--;
     jobs[id].status = "failed";
     jobs[id].error = error.message;
+    for (const tf of textFilePaths) {
+       if (fs.existsSync(tf)) fs.unlinkSync(tf);
+    }
   }
 }
