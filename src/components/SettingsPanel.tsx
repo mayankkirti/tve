@@ -1,5 +1,6 @@
 import React from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import * as mm from 'music-metadata';
 import { VideoConfig, VisualizerStyle, TrackInfo } from '../types';
 import { RESOLUTIONS, GOOGLE_FONTS } from '../constants';
 import { Settings, Image as ImageIcon, Music, Play, Plus, X, RotateCcw } from 'lucide-react';
@@ -132,15 +133,57 @@ export function SettingsPanel({
       }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, key: 'audioUrl' | 'logoUrl') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, key: 'audioUrl' | 'logoUrl') => {
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file) + '#' + encodeURIComponent(file.name);
-      setConfig(prev => {
-        const nextState = { ...prev, [key]: url };
-        if (key === 'audioUrl') {
-          nextState.name = file.name.replace(/\.[^/.]+$/, "");
+      
+      let updates: Partial<VideoConfig> = {};
+      if (key === 'audioUrl') {
+        let newName = file.name.replace(/\.[^/.]+$/, "");
+        try {
+          const metadata = await mm.parseBlob(file);
+          const { common } = metadata;
+          
+          if (common) {
+             const title = common.title || newName;
+             const artist = common.artist || '';
+             const genre = common.genre && common.genre.length > 0 ? common.genre.join(', ') : '';
+             
+             let projName = title;
+             if (artist) projName += ` - ${artist}`;
+             if (genre) projName += ` | ${genre}`;
+             
+             updates.name = projName;
+             
+             if (common.album) updates.albumName = common.album;
+             
+             let tracklistStr = `00:00 ${title}`;
+             if (artist) tracklistStr += ` - ${artist}`;
+             
+             if (common.comment && common.comment.length > 0) {
+               const tracklistComment = common.comment.find(c => {
+                 const text = typeof c === 'string' ? c : c?.text;
+                 return text && /\d{1,2}:\d{2}/.test(text);
+               });
+               if (tracklistComment) {
+                 tracklistStr = typeof tracklistComment === 'string' ? tracklistComment : tracklistComment.text || tracklistStr;
+               }
+             }
+             
+             updates.tracklistRaw = tracklistStr;
+             updates.parsedTracklist = parseTracklist(tracklistStr);
+          } else {
+             updates.name = newName;
+          }
+        } catch (err) {
+          console.warn("Failed to parse metadata", err);
+          updates.name = newName;
         }
+      }
+
+      setConfig(prev => {
+        const nextState = { ...prev, [key]: url, ...updates };
         return nextState;
       });
     }
